@@ -1,18 +1,96 @@
 #!/usr/bin/env python
-import tkinter as tk
-from tkinter import ttk
+
 import json
 import re
 import curses
-from curses import wrapper
+from curses import wrapper, panel
 from abc import ABC, abstractmethod
-window: tk.Tk = tk.Tk()
+import glob
 
 # Time regex
 # ^([0-1][0-9]|2[0-3]):[0-5][0-9]$
 
 # Color regex
 # ^#(?:[0-9a-fA-F]{3}){1,2}$
+
+class Menu(object):
+    def __init__(self, title: str, items, stdscreen):
+        width = 150
+        height = 40
+
+        x_pos = (curses.COLS - width) // 2
+        y_pos = (curses.LINES - height) // 2
+
+        self.title = title
+
+        self.shadow_window = stdscreen.subwin(height + 2, width + 2, y_pos, x_pos)
+        self.shadow_window.bkgd(' ', curses.color_pair(3))
+        self.shadow_window.refresh()
+
+        self.border_window = stdscreen.subwin(height + 2, width + 2, y_pos - 1, x_pos - 1)
+        self.border_window.bkgd(' ', curses.color_pair(1))
+        self.border_window.border(0)
+        self.border_window.addstr(0, 3, " Timetable App ")
+        self.border_window.refresh()
+
+        self.window = stdscreen.subwin(height, width, y_pos, x_pos)
+        self.window.keypad(1)
+        self.window.bkgd(' ', curses.color_pair(1))
+
+        self.panel = panel.new_panel(self.window)
+        self.panel.hide()
+        panel.update_panels()
+
+        self.position = 0
+        self.items = items
+        self.items.append(("exit", "exit"))
+
+    def navigate(self, n):
+        self.position += n
+        if self.position < 0:
+            self.position = 0
+        elif self.position >= len(self.items):
+            self.position = len(self.items) - 1
+
+    def display(self):
+        self.panel.top()
+        self.panel.show()
+        self.window.clear()
+
+        while True:
+            self.window.addstr(0, 2, self.title)
+            self.window.refresh()
+            curses.doupdate()
+            for index, item in enumerate(self.items):
+                if index == self.position:
+                    mode = curses.A_REVERSE
+                else:
+                    mode = curses.A_NORMAL
+
+                msg = "%d. %s" % (index, item[0])
+                self.window.addstr(2 + index, 1, msg, mode)
+
+            key = self.window.getch()
+
+            if key in [curses.KEY_ENTER, ord("\n")]:
+                if self.position == len(self.items) - 1:
+                    break
+                else:
+                    if len(self.items[self.position]) <= 2:
+                        self.items[self.position][1]()
+                    else:
+                        self.items[self.position][1](self.items[self.position][2])
+
+            elif key == curses.KEY_UP:
+                self.navigate(-1)
+
+            elif key == curses.KEY_DOWN:
+                self.navigate(1)
+
+        self.window.clear()
+        self.panel.hide()
+        panel.update_panels()
+        curses.doupdate()
 
 
 class Window(ABC):
@@ -79,20 +157,7 @@ class Period:
         self.room: str | None = room
 
     def render(self, x_pos, y_pos) -> None:
-        frame = tk.Frame(window, padx=10, pady=10, highlightbackground=self.period_type.color, highlightthickness=5, bd=0)
-        frame.config(width=1000)
-        frame.grid(column=x_pos, row=y_pos, sticky="nsew", pady=2, padx=2)
-
-        name_label = tk.Label(frame, text=self.period_type.name)
-        name_label.pack()
-
-        if self.period_type.teacher is not None:
-            teacher_label = tk.Label(frame, text=self.period_type.teacher)
-            teacher_label.pack()
-
-        if self.room is not None:
-            room_label = tk.Label(frame, text=self.room)
-            room_label.pack()
+        pass
 
     def __str__(self) -> str:
         return f"{self.period_type}; Period - room: {self.room}"
@@ -116,14 +181,36 @@ class TimeTable:
 
 
 class App:
-    def __init__(self, cell_width, cell_height) -> None:
+    def __init__(self, stdscreen) -> None:
         self.current_timetable: TimeTable | None = None
+        self.load_file("data/test1.json")
 
-        self.cell_width = cell_width
-        self.cell_height = cell_height
-        
-        self.total_width = cell_width * 7
-        self.total_height = 100
+        self.screen = stdscreen
+        curses.curs_set(0)
+
+        curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
+        curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLUE)
+        curses.init_pair(3, curses.COLOR_GREEN, curses.COLOR_BLACK)
+
+        stdscreen.bkgd(' ', curses.color_pair(2))
+
+        files = glob.glob("data/*.json")
+        file_items = []
+        for file in files:
+            file_items.append((file, self.load_file, file))
+
+        if len(file_items) == 0:
+            file_items.append(
+                ("No files found! Are you sure they are in the correct directory? (data/name.json)", curses.beep))
+
+        files_menu = Menu("Select a file to open", file_items, self.screen)
+
+        main_menu_items = [
+            ("Open Existing", files_menu.display),
+            ("Create New", curses.beep),
+        ]
+        main_menu = Menu("Open an existing timetable or create a new one", main_menu_items, self.screen)
+        main_menu.display()
 
     def load_file(self, filename: str) -> None:
         json_data: dict | None = None
@@ -139,7 +226,7 @@ class App:
             timetable_raw: list[dict] = json_data["timetable"]
             subjects_raw: dict = json_data["subjects"]
             period_data = json_data["period_data"]
-            timetabe_name: str = json_data["name"]
+            timetable_name: str = json_data["name"]
         except:
             print("Invalid configuration (Missing Data)")
             return
@@ -166,38 +253,12 @@ class App:
 
                 period: Period = Period(subject, room)
 
-                periods[i][period_id] = period;
+                periods[i][period_id] = period
 
-        self.current_timetable = TimeTable(periods, subjects, period_data, timetabe_name)
-        self.total_height = len(period_data) * self.cell_height
+        self.current_timetable = TimeTable(periods, subjects, period_data, timetable_name)
         
         print(f"Timetable at {filename} successfully loaded")
 
 
-def main():
-    # Create the app's main window
-    window.title("Timetable")
-
-    cell_width = 125
-    cell_height = 75
-
-    app: App = App(cell_width, cell_height)
-    app.load_file("data/test1.json")
-    print(app.total_height)
-
-    window.geometry(f"{app.total_width}x{app.total_height}")
-    window.minsize(app.total_width, app.total_height)
-
-    if app.current_timetable is not None:
-        app.current_timetable.render()
-
-    style = ttk.Style()
-    style.theme_use("aqua")
-    style.configure("aqua", background="#FFFFFF")
-
-    # Start the event loop
-    window.mainloop()
-
-
 if __name__ == "__main__":
-    main()
+    curses.wrapper(App)
