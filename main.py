@@ -33,12 +33,12 @@ class Subject:
 
 
 class Period:
-    def __init__(self, period_type: Subject, room: str) -> None:
-        self.period_type: Subject = period_type
+    def __init__(self, subject: Subject, room: str) -> None:
+        self.subject: Subject = subject
         self.room: str = room
 
     def __str__(self) -> str:
-        return f"{self.period_type}; Period - room: {self.room}"
+        return f"{self.subject}; Period - room: {self.room}"
 
 
 class PeriodTimeStruct:
@@ -56,11 +56,49 @@ class TimeTable:
 
         self.periods: dict[int, dict[str, Period]] = periods
         self.subjects: dict[str, Subject] = subjects
-        self.period_times: dict = period_times
+        self.period_times: dict[str, PeriodTimeStruct] = period_times
         self.name: str = name
 
     def save_file(self, filename: str) -> None:
-        pass
+        json_data: dict = {}
+
+        timetable_raw: list[dict[str, dict[str, str]]] = []
+        subjects_raw: dict[str, dict[str, str]] = {}
+        period_times_raw: dict[str, dict[str, str]] = {}
+
+        for day_index, day in self.periods.items():
+            day_data: dict[str, dict[str, str]] = {}
+
+            for period_index, period in day.items():
+                subject_id: str = period.subject.id
+                room: str = period.room
+
+                day_data[period_index] = {"subject": subject_id, "room": room}
+
+            timetable_raw.append(day_data)
+
+        for subject_index, subject in self.subjects.items():
+            name: str = subject.name
+            teacher: str = subject.teacher
+
+            subjects_raw[subject_index] = {"name": name, "teacher": teacher}
+
+        for period_times_index, period_times in self.period_times.items():
+            name: str = period_times.name
+            start_time: str = period_times.start_time
+            end_time: str = period_times.end_time
+
+            period_times_raw[period_times_index] = {"name": name, "start": start_time, "end": end_time}
+
+        json_data["name"] = self.name
+        json_data["timetable"] = timetable_raw
+        json_data["subjects"] = subjects_raw
+        json_data["period_times"] = period_times_raw
+
+        json_object = json.dumps(json_data, indent=4)
+
+        with open(filename, "w") as outfile:
+            outfile.write(json_object)
 
 
 class ContentWindow(ABC):
@@ -90,8 +128,8 @@ class PeriodWindow(ContentWindow):
 
     def display(self) -> None:
         self.window.erase()
-        self.window.addstr(0, 1, self.period.period_type.name)
-        self.window.addstr(1, 1, self.period.period_type.teacher)
+        self.window.addstr(0, 1, self.period.subject.name)
+        self.window.addstr(1, 1, self.period.subject.teacher)
         self.window.addstr(2, 1, self.period.room)
         self.window.refresh()
 
@@ -307,6 +345,7 @@ class App:
     def open_file(self, filename: str) -> None:
         self.load_file(filename)
         if self.current_timetable is not None:
+            self.current_timetable.save_file("out.json")
             timetable_view = TimetableViewMenu(self.current_timetable, self.screen)
             timetable_view.display()
 
@@ -322,7 +361,7 @@ class App:
         try:
             timetable_raw: list[dict] = json_data["timetable"]
             subjects_raw: dict = json_data["subjects"]
-            period_times_raw = json_data["period_times"]
+            period_times_raw: dict = json_data["period_times"]
             timetable_name: str = json_data["name"]
         except KeyError:
             print("Invalid configuration (Missing Data)")
