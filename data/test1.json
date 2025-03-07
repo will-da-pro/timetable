@@ -3,10 +3,6 @@
   "version": "0.0.1",
   "timetable": [
     {
-      "rc": {
-        "subject": "rc",
-        "room": "T.1.2"
-      },
       "1": {
         "subject": "physics",
         "room": "T.G.3"
@@ -29,10 +25,6 @@
         "subject": "maths",
         "room": "L.1.1"
       },
-      "rc": {
-        "subject": "rc",
-        "room": "T.1.2"
-      },
       "1": {
         "subject": "biology",
         "room": "T.G.4"
@@ -50,10 +42,6 @@
       "0": {
         "subject": "maths",
         "room": "L.1.1"
-      },
-      "rc": {
-        "subject": "rc",
-        "room": "T.1.2"
       },
       "1": {
         "subject": "chemistry",
@@ -73,10 +61,6 @@
       }
     },
     {
-      "rc": {
-        "subject": "rc",
-        "room": "T.1.2"
-      },
       "1": {
         "subject": "chemistry",
         "room": "T.G.5"
@@ -98,10 +82,6 @@
       "0": {
         "subject": "maths",
         "room": "L.1.1"
-      },
-      "rc": {
-        "subject": "rc",
-        "room": "T.1.2"
       },
       "1": {
         "subject": "english",
@@ -126,11 +106,6 @@
       "name": "Maths",
       "teacher": "Mr Stav",
       "accent_color": "#111111"
-    },
-    "rc": {
-      "name": "Roll Call",
-      "teacher": "Mr He",
-      "accent_color": "#FF0000"
     },
     "english": {
       "name": "English",
@@ -163,26 +138,16 @@
       "accent_color": "#708080"
     }
   },
-  "period_data": {
+  "period_times": {
     "0": {
       "name": "Period 0",
       "start": "0800",
       "end": "0845"
     },
-    "rc": {
-      "name": "Roll Call",
-      "start": "0845",
-      "end": "0905"
-    },
     "1": {
       "name": "Period 1",
       "start": "0905",
       "end": "1020"
-    },
-    "b1": {
-      "name": "Break 1",
-      "start": "1020",
-      "end": "1045"
     },
     "2": {
       "name": "Period 2",
@@ -193,11 +158,6 @@
       "name": "Period 3",
       "start": "1205",
       "end": "1320"
-    },
-    "b2": {
-      "name": "Break 2",
-      "start": "1320",
-      "end": "1400"
     },
     "4": {
       "name": "Period 4",
