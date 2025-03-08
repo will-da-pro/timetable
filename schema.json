@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "timetable-schema",
+  "title": "Timetable",
+  "description": "A Timetable for school",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "The name of the timetable",
+      "type": "string"
+    },
+    "timetable": {
+      "description": "The timetable data"
+    }
+  }
+}

@@ -18,13 +18,15 @@ class ExitCurses(Exception):
     def __init__(self, message: str):
         self.message: str = message
 
-    def __str__(self):
-        return self.message
+
+class InvalidDataException(Exception):
+    def __init__(self, message: str):
+        self.message: str = message
 
 
 class Subject:
-    def __init__(self, id: str, name: str, teacher: str) -> None:
-        self.id: str = id
+    def __init__(self, subject_id: str, name: str, teacher: str) -> None:
+        self.subject_id: str = subject_id
         self.name: str = name
         self.teacher: str = teacher
 
@@ -70,7 +72,7 @@ class TimeTable:
             day_data: dict[str, dict[str, str]] = {}
 
             for period_index, period in day.items():
-                subject_id: str = period.subject.id
+                subject_id: str = period.subject.subject_id
                 room: str = period.room
 
                 day_data[period_index] = {"subject": subject_id, "room": room}
@@ -312,7 +314,6 @@ class TimetableViewMenu(Menu):
 class App:
     def __init__(self, stdscreen: curses.window) -> None:
         self.current_timetable: TimeTable | None = None
-        self.load_file("data/test1.json")
 
         self.screen = stdscreen
         curses.curs_set(0)
@@ -345,27 +346,28 @@ class App:
     def open_file(self, filename: str) -> None:
         self.load_file(filename)
         if self.current_timetable is not None:
-            self.current_timetable.save_file("out.json")
+            self.current_timetable.save_file("data/out.json")
             timetable_view = TimetableViewMenu(self.current_timetable, self.screen)
             timetable_view.display()
 
     def load_file(self, filename: str) -> None:
         with open(filename) as f:
-            json_data: dict | None = json.load(f)
+            try:
+                json_data: dict | None = json.load(f)
+            except json.decoder.JSONDecodeError:
+                raise InvalidDataException("Invalid JSON")
 
         if json_data is None:
-            return
-
-        #print("JSON found")
+            raise InvalidDataException("No data found!")
 
         try:
-            timetable_raw: list[dict] = json_data["timetable"]
-            subjects_raw: dict = json_data["subjects"]
-            period_times_raw: dict = json_data["period_times"]
             timetable_name: str = json_data["name"]
+            timetable_raw: list[dict[str, dict[str, str]]] = json_data["timetable"]
+            subjects_raw: dict[str, dict[str, str]] = json_data["subjects"]
+            period_times_raw: dict[str, dict[str, str]] = json_data["period_times"]
         except KeyError:
             print("Invalid configuration (Missing Data)")
-            return
+            raise InvalidDataException("Data field not found")
     
 
         subjects: dict[str, Subject] = {}
@@ -374,7 +376,7 @@ class App:
             teacher: str | None = subject_raw.get("teacher")
 
             if name is None or teacher is None:
-                return
+                raise InvalidDataException(f"{subject_id} has no name or teacher")
 
             subjects[subject_id] = Subject(subject_id, name, teacher)
 
@@ -387,8 +389,7 @@ class App:
                 room: str | None = val.get("room")
  
                 if subject is None or room is None:
-                    #print("Invalid subject name")
-                    return
+                    raise InvalidDataException(f"{period_id} has no subject or room for day {day}")
 
                 period: Period = Period(subject, room)
 
@@ -402,7 +403,7 @@ class App:
             end_time: str | None = period_time_data.get("end")
 
             if name is None or start_time is None or end_time is None:
-                return
+                raise InvalidDataException(f"Period {period_num} is missing data")
 
             period_time_struct = PeriodTimeStruct(name, start_time, end_time)
             period_times[period_num] = period_time_struct
@@ -416,5 +417,9 @@ class App:
 if __name__ == "__main__":
     try:
         curses.wrapper(App)
+
     except ExitCurses as e:
+        print(e)
+
+    except InvalidDataException as e:
         print(e)
