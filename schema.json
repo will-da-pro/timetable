@@ -10,7 +10,76 @@
       "type": "string"
     },
     "timetable": {
-      "description": "The timetable data"
+      "description": "The timetable data",
+      "type": "array",
+      "items": { "$ref": "#/$defs/timetable_day" },
+      "minItems": 5,
+      "maxItems": 5
+    },
+    "subjects": {
+      "description": "All subject data",
+      "type": "object",
+      "patternProperties": {
+        "^.*$": {
+          "name": {
+            "description": "The name of the subject",
+            "type": "string"
+          },
+          "teacher": {
+            "description": "The teacher of the subject",
+            "type": "string"
+          },
+          "required": ["name", "teacher"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "period_times": {
+      "description": "All period times and names",
+      "type": "object",
+      "patternProperties": {
+        "^.*$": {
+          "name": {
+            "description": "The name of the period time",
+            "type": "string"
+          },
+          "start": {
+            "description": "The time at which the period starts",
+            "type": "string"
+          },
+          "end": {
+            "description": "The time at which the period ends",
+            "type": "string"
+          },
+          "required": ["name", "start", "end"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "required": ["name", "timetable", "subjects", "period_times"]
+  },
+  "$defs": {
+    "timetable_day": {
+      "description": "One day in the timetable",
+      "type": "object",
+      "patternProperties": {
+        "^.*$": {
+          "description": "One period in the timetable",
+          "type": "object",
+          "properties": {
+            "subject": {
+              "description": "The ID of the subject",
+              "type": "string"
+            },
+            "room": {
+              "description": "The room for that period",
+              "type": "string"
+            }
+          },
+          "required": ["subject", "room"]
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

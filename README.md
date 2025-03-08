@@ -4,11 +4,13 @@ Created by William D'Olier
 
 ## Requirements
 
-All packages in this app are included in python by default.
+[Python 3.11 or newer](https://www.python.org/downloads/)
+
+All packages used by this app are included in Python 3.11 by default.
 
 Requires a UNIX based operating system (MacOS or Linux).
 
-Purely terminal based, can be run without a desktop environment.
+This app is purely terminal based, so can be run without a desktop environment.
 
 ## Running
 

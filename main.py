@@ -13,19 +13,38 @@ import glob
 # Color regex
 # ^#(?:[0-9a-fA-F]{3}){1,2}$
 
+# Exception Handling
+
 
 class ExitCurses(Exception):
+    """
+    Allows for the exiting of the curses window gracefully.
+    """
     def __init__(self, message: str):
         self.message: str = message
 
 
 class InvalidDataException(Exception):
+    """
+    Raised when an invalid JSON data is encountered.
+    """
     def __init__(self, message: str):
         self.message: str = message
 
 
 class Subject:
+    """
+    Class for each unique subject
+
+    e.g. Maths, English, Science, etc.
+    """
     def __init__(self, subject_id: str, name: str, teacher: str) -> None:
+        """
+        Initializes a Subject object.
+        :param string subject_id: ID of the subject.
+        :param string name: Name of the subject.
+        :param string teacher: Teacher of the subject.
+        """
         self.subject_id: str = subject_id
         self.name: str = name
         self.teacher: str = teacher
@@ -33,7 +52,8 @@ class Subject:
     def __str__(self) -> str:
         return f"Period Type - name: {self.name}, teacher: {self.teacher}"
 
-
+# Class for a period during the day, has a subject and room
+# Created for every period time on every day
 class Period:
     def __init__(self, subject: Subject, room: str) -> None:
         self.subject: Subject = subject
@@ -42,14 +62,18 @@ class Period:
     def __str__(self) -> str:
         return f"{self.subject}; Period - room: {self.room}"
 
-
+# Class for defining period times and names
+# e.g. Period 0, start at 0800, end at 0845
 class PeriodTimeStruct:
     def __init__(self, name: str, start_time: str, end_time: str) -> None:
         self.name = name
         self.start_time = start_time
         self.end_time = end_time
 
-
+# Class for an entire timetable object, includes:
+# An array containing a dictionary of periods for each day
+# A dictionary of all subjects
+# A dictionary of all period times
 class TimeTable:
     def __init__(self, periods: dict[int, dict[str, Period]], 
                  subjects: dict[str, Subject], 
