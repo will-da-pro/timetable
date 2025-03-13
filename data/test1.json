@@ -18,7 +18,7 @@
         {
             "0": {
                 "subject": "maths",
-                "room": "L.1.1   sd"
+                "room": "L.1.1"
             },
             "2": {
                 "subject": "physics",
@@ -63,10 +63,6 @@
             "4": {
                 "subject": "english",
                 "room": "T.1.5"
-            },
-            "0": {
-                "subject": "biology",
-                "room": "yes"
             }
         },
         {
