@@ -377,7 +377,7 @@ class ListMenu(Menu):
             else:
                 mode = curses.A_NORMAL
 
-            msg = "%d. %s" % (index, item[0])
+            msg: str = f"{index}. {item[0]}"
             self.window.addstr(2 + index, 1, msg, mode)
 
     def display(self) -> None:
@@ -418,6 +418,7 @@ class TimetableMenu(Menu):
         :param timetable: The timetable object to view.
         :param stdscreen: Curses screen to use.
         """
+
         super().__init__(timetable.name, stdscreen)
 
         self.states: dict[int, str] = {
@@ -613,7 +614,7 @@ class TimetableMenu(Menu):
                 self.state = 1
 
             elif self.list_items[self.selected_list_item][1] == "save_exit":
-                if self.selected_period is not None and self.input_buffer != "":
+                if self.selected_subject is not None:
                     period_id: str = list(self.timetable.period_times.keys())[self.selected_period_y]
                     new_period = Period(self.selected_subject, self.input_buffer)
 
@@ -623,11 +624,11 @@ class TimetableMenu(Menu):
 
                     self.state = 1
 
+                else:
+                    curses.beep()
+
             elif self.list_items[self.selected_list_item][1] == "back":
                 self.state = 1
-
-            else:
-                curses.beep()
 
         elif key == 27:
             self.state = 1
@@ -777,6 +778,14 @@ class TimetableMenu(Menu):
             key = self.window.getch()
 
             self.process_input(key)
+
+
+class TimetableCreatorMenu(Menu):
+    def __init__(self, stdscreen: curses.window) -> None:
+        super().__init__("Creating New Timetable", stdscreen)
+
+    def display(self) -> None:
+        pass
 
 
 class SubjectEditMenu(ListMenu):
