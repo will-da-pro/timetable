@@ -28,7 +28,7 @@ class ExitCurses(Exception):
 
 class InvalidDataException(Exception):
     """
-    Raised when an invalid JSON data is encountered.
+    Raised when invalid JSON data is encountered.
     """
 
     def __init__(self, message: str):
@@ -82,7 +82,7 @@ class PeriodTimeStruct:
     end_time: str
 
 
-class TimeTable:
+class Timetable:
     """
     Class for an entire timetable object
 
@@ -100,7 +100,7 @@ class TimeTable:
                  name: str,
                  filename: str) -> None:
         """
-        Initializes a TimeTable object.
+        Initializes a Timetable object.
 
         :param periods: A dictionary of periods for each day.
         :param subjects: A dictionary of all subjects.
@@ -177,7 +177,7 @@ class ContentWindow(ABC):
 
     def __init__(self, width: int, height: int,
                  x_pos: int, y_pos: int,
-                 parent: curses.window) -> None:
+                 parent) -> None:
 
         """
         Initializes a content window object.
@@ -219,7 +219,7 @@ class PeriodWindow(ContentWindow):
                  width: int, height: int,
                  x_pos: int, y_pos: int,
                  x_index: int, y_index: int,
-                 parent: curses.window) -> None:
+                 parent) -> None:
 
         super().__init__(width, height, x_pos, y_pos, parent)
 
@@ -252,7 +252,7 @@ class PeriodTimeWindow(ContentWindow):
     def __init__(self, period_times: PeriodTimeStruct,
                  width: int, height: int,
                  x_pos: int, y_pos: int,
-                 parent: curses.window) -> None:
+                 parent) -> None:
 
         super().__init__(width, height, x_pos, y_pos, parent)
         self.period_times = period_times
@@ -299,13 +299,13 @@ class Menu(ABC):
 
         self.stdscreen: curses.window = stdscreen
 
-        self.shadow_window: curses.window = stdscreen.subwin(height + 2, width + 2, self.y_pos, self.x_pos)
+        self.shadow_window = stdscreen.subwin(height + 2, width + 2, self.y_pos, self.x_pos)
         self.shadow_window.bkgd(' ', curses.color_pair(3))
         self.shadow_window.refresh()
 
         header: str = "TIMETABLE APP"
 
-        self.border_window: curses.window = stdscreen.subwin(height + 2, width + 2, self.y_pos - 1, self.x_pos - 1)
+        self.border_window = stdscreen.subwin(height + 2, width + 2, self.y_pos - 1, self.x_pos - 1)
         self.border_window.bkgd(' ', curses.color_pair(1))
         self.border_window.border(0)
         self.border_window.addch(0, (self.width - len(header)) // 2 - 1, "┤")
@@ -313,9 +313,39 @@ class Menu(ABC):
         self.border_window.addstr(0, (self.width - len(header)) // 2, f" {header} ", curses.color_pair(4))
         self.border_window.refresh()
 
-        self.window: curses.window = stdscreen.subwin(height, width, self.y_pos, self.x_pos)
+        self.window = stdscreen.subwin(height, width, self.y_pos, self.x_pos)
         self.window.keypad(True)
         self.window.bkgd(' ', curses.color_pair(1))
+
+        self.selected_list_item: int = 0
+        self.list_size: int = 0
+
+        self.list_items: list[tuple] = []
+
+        self.editing: bool = False
+
+    def display_list(self) -> None:
+        for index, item in enumerate(self.list_items):
+            if index == self.selected_list_item:
+                self.window.addstr(index + 2, 1, f"{index + 1}. {item[0]}", curses.A_REVERSE)
+
+            else:
+                self.window.addstr(index + 2, 1, f"{index + 1}. {item[0]}")
+
+    def navigate_list(self, change: int) -> None:
+        self.selected_list_item += change
+
+        if self.selected_list_item < 0:
+            self.selected_list_item = 0
+
+        elif self.selected_list_item >= self.list_size:
+            self.selected_list_item = self.list_size - 1
+
+        if self.list_items[self.selected_list_item][1] == "editor":
+            self.editing = True
+
+        else:
+            self.editing = False
 
     def exit(self) -> None:
         """
@@ -351,6 +381,8 @@ class ListMenu(Menu):
 
         self.items.append(("Exit", "Exit"))
 
+        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit"
+
     def navigate(self, position_change) -> None:
         self.position += position_change
 
@@ -371,6 +403,7 @@ class ListMenu(Menu):
         self.window.addstr(0, 2, self.title)
         self.window.refresh()
         curses.doupdate()
+
         for index, item in enumerate(self.items):
             if index == self.position:
                 mode = curses.A_REVERSE
@@ -387,6 +420,8 @@ class ListMenu(Menu):
 
         while True:
             self.display_items()
+            self.window.addstr(self.height - 1, 2, self.shortcut_info)
+            self.window.refresh()
 
             key = self.window.getch()
 
@@ -403,6 +438,13 @@ class ListMenu(Menu):
                         self.panel.hide()
                         self.items[self.position][1](*self.items[self.position][2:])
 
+            elif key == ord("q"):
+                raise ExitCurses("Exiting")
+
+            elif key == 27:
+                self.exit()
+                return
+
             elif key == curses.KEY_UP:
                 self.navigate(-1)
 
@@ -411,7 +453,7 @@ class ListMenu(Menu):
 
 
 class TimetableMenu(Menu):
-    def __init__(self, timetable: TimeTable, stdscreen: curses.window) -> None:
+    def __init__(self, timetable: Timetable, stdscreen: curses.window) -> None:
         """
         Creates a menu for rendering a timetable, with an editor.
 
@@ -426,7 +468,7 @@ class TimetableMenu(Menu):
             0: "Viewing",
             1: "Editing",
             2: "Editing Period",
-            3: "Selecting Subject",
+            3: "Selecting Subject"
         }
 
         self.state: int = 0
@@ -457,14 +499,8 @@ class TimetableMenu(Menu):
         self.selected_period: Period | None = None
         self.selected_subject: Subject | None = None
 
-        self.selected_list_item: int = 0
-        self.list_size: int = 0
-
-        self.list_items: list[tuple] = []
-
         self.input_buffer: str = ""
         self.max_input_size: int = 20
-        self.editing: bool = False
 
     def create_period_windows(self) -> None:
         self.period_windows = []
@@ -538,21 +574,6 @@ class TimetableMenu(Menu):
 
         elif self.selected_period_y >= self.cell_y_count:
             self.selected_period_y = self.cell_y_count - 1
-
-    def navigate_list(self, change: int) -> None:
-        self.selected_list_item += change
-
-        if self.selected_list_item < 0:
-            self.selected_list_item = 0
-
-        elif self.selected_list_item >= self.list_size:
-            self.selected_list_item = self.list_size - 1
-
-        if self.list_items[self.selected_list_item][1] == "editor":
-            self.editing = True
-
-        else:
-            self.editing = False
 
     # Input Processing
 
@@ -676,7 +697,8 @@ class TimetableMenu(Menu):
 
         elif key in [ord('s'), ord('S')] and self.editing is False:
             self.timetable.save_file()
-            raise ExitCurses("Saved, Exiting")
+            self.stdscreen.addstr(curses.LINES - 1, 1, "Successfully saved")
+            self.stdscreen.refresh()
 
         else:
             if self.state == 0:
@@ -695,14 +717,6 @@ class TimetableMenu(Menu):
                 raise ExitCurses("Invalid state")
 
     # Displaying Windows
-
-    def display_list(self) -> None:
-        for index, item in enumerate(self.list_items):
-            if index == self.selected_list_item:
-                self.window.addstr(self.margin + index, self.margin, f"{index + 1}. {item[0]}", curses.A_REVERSE)
-
-            else:
-                self.window.addstr(self.margin + index, self.margin, f"{index + 1}. {item[0]}")
 
     def display_viewing(self) -> None:
         self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [s] Save Timetable, [e] Edit Timetable"
@@ -784,8 +798,297 @@ class TimetableCreatorMenu(Menu):
     def __init__(self, stdscreen: curses.window) -> None:
         super().__init__("Creating New Timetable", stdscreen)
 
+        self.states: dict[int, str] = {
+            -1: "Exiting",
+            0: "Basic Info",
+            1: "Creating Period Times",
+            2: "Viewing Subjects",
+            3: "Editing Subject"
+        }
+
+        self.state: int = 0
+
+        self.panel = panel.new_panel(self.window)
+        self.panel.hide()
+        panel.update_panels()
+
+        self.shortcut_info: str = "Shortcuts: [esc] Back, [q] Quit"
+
+        self.input_buffer: list[str] = ["", ""]
+        self.max_input_size: int = 20
+
+        self.timetable_name: str = ""
+        self.num_periods: int = 4
+
+        self.editing: bool = True
+
+        self.include_period_zero: bool = False
+
+        self.period_times: dict[str, PeriodTimeStruct] = {}
+        self.subjects: list[Subject] = []
+
+    def process_period_times(self) -> None:
+        if self.state != 1:
+            return
+
+        self.period_times = {}
+
+        for index in range(len(self.input_buffer) // 2):
+            self.period_times[str(index)] = PeriodTimeStruct(f"Period {index}",
+                                                             self.input_buffer[index * 2],
+                                                             self.input_buffer[index * 2 + 1])
+
+    def process_input_basic_info(self, key: int) -> None:
+        if key in [curses.KEY_ENTER, ord("\n")]:
+            if self.list_items[self.selected_list_item][1] == "Back":
+                self.state = -1
+
+            elif self.list_items[self.selected_list_item][1] == "Next":
+                if self.input_buffer[0] == "" or self.input_buffer[1] == "":
+                    curses.beep()
+
+                else:
+                    self.timetable_name = self.input_buffer[0]
+                    self.num_periods = int(self.input_buffer[1])
+
+                    self.input_buffer = []
+
+                    for i in range(self.num_periods):
+                        self.input_buffer.append("")
+                        self.input_buffer.append("")
+
+                    self.selected_list_item = 0
+
+                    self.state = 1
+
+            elif self.list_items[self.selected_list_item][1] == "period_zero":
+                self.include_period_zero = not self.include_period_zero
+
+        elif key == 27:
+            self.state = -1
+
+        elif key == curses.KEY_UP:
+            self.navigate_list(-1)
+
+        elif key == curses.KEY_DOWN:
+            self.navigate_list(1)
+
+        elif self.list_items[self.selected_list_item][1] == "editor":
+            if self.list_items[self.selected_list_item][2] == "name":
+                if ((ord('!') <= key <= ord('~') or key == ord(' ')) and
+                        len(self.input_buffer[0]) < self.max_input_size):
+                    self.input_buffer[0] += chr(key)
+
+                elif key in [curses.KEY_BACKSPACE, 127] and len(self.input_buffer) > 0:
+                    self.input_buffer[0] = self.input_buffer[0][:-1]
+
+            elif self.list_items[self.selected_list_item][2] == "periods":
+                if ord('3') <= key <= ord('6') and len(self.input_buffer[1]) < 1:
+                    self.input_buffer[1] += chr(key)
+
+                elif key in [curses.KEY_BACKSPACE, 127] and len(self.input_buffer) > 0:
+                    self.input_buffer[1] = self.input_buffer[1][:-1]
+
+    def process_input_creating_period_times(self, key: int) -> None:
+        if key in [curses.KEY_ENTER, ord("\n")]:
+            if self.list_items[self.selected_list_item][1] == "Back":
+                self.input_buffer = [self.timetable_name, str(self.num_periods)]
+                self.selected_list_item = 0
+
+                self.state = 0
+
+            elif self.list_items[self.selected_list_item][1] == "Next":
+                self.input_buffer = []
+                self.selected_list_item = 0
+
+                self.process_period_times()
+
+                self.state = 2
+
+        elif key == 27:
+            self.input_buffer = [self.timetable_name, str(self.num_periods)]
+            self.selected_list_item = 0
+
+            self.state = 0
+
+        elif key == curses.KEY_UP:
+            self.navigate_list(-1)
+
+        elif key == curses.KEY_DOWN:
+            self.navigate_list(1)
+
+        elif self.list_items[self.selected_list_item][1] == "editor":
+            start_index: int = self.selected_list_item // 3
+
+            if self.list_items[self.selected_list_item][2] == "start":
+                if ord('0') <= key <= ord('9') and len(self.input_buffer[2 * start_index]) < 4:
+                    self.input_buffer[2 * start_index] += chr(key)
+
+                elif key in [curses.KEY_BACKSPACE, 127] and len(self.input_buffer[2 * start_index]) > 0:
+                    self.input_buffer[2 * start_index] = self.input_buffer[2 * start_index][:-1]
+
+            elif self.list_items[self.selected_list_item][2] == "end":
+                if ord('0') <= key <= ord('9') and len(self.input_buffer[2 * start_index + 1]) < 4:
+                    self.input_buffer[2 * start_index + 1] += chr(key)
+
+                elif key in [curses.KEY_BACKSPACE, 127] and len(self.input_buffer[2 * start_index + 1]) > 0:
+                    self.input_buffer[2 * start_index + 1] = self.input_buffer[2 * start_index + 1][:-1]
+
+    def process_input_viewing_subjects(self, key: int) -> None:
+        if key in [curses.KEY_ENTER, ord("\n")]:
+            if self.list_items[self.selected_list_item][1] == "Back":
+                self.input_buffer = []
+
+                for i in range(self.num_periods):
+                    self.input_buffer.append("")
+                    self.input_buffer.append("")
+
+                self.selected_list_item = 0
+
+                self.state = 1
+
+            elif self.list_items[self.selected_list_item][1] == "New":
+                subject_edit_menu = SubjectEditMenu(None, self.stdscreen)
+                new_subject: Subject | None = subject_edit_menu.display()
+
+                if new_subject is not None:
+                    self.subjects.append(new_subject)
+
+            elif self.list_items[self.selected_list_item][1] == "Next":
+                curses.beep()
+
+            else:
+                subject_edit_menu = SubjectEditMenu(self.subjects[self.selected_list_item],
+                                                    self.stdscreen)
+
+                new_subject: Subject | None = subject_edit_menu.display()
+
+                if new_subject is not None:
+                    self.subjects[self.selected_list_item] = new_subject
+
+        if key == 27:
+            self.input_buffer = []
+
+            for i in range(self.num_periods):
+                self.input_buffer.append("")
+                self.input_buffer.append("")
+
+            self.selected_list_item = 0
+
+            self.state = 1
+
+        elif key == curses.KEY_UP:
+            self.navigate_list(-1)
+
+        elif key == curses.KEY_DOWN:
+            self.navigate_list(1)
+
+    def process_input_editing_subject(self, key: int) -> None:
+        if key == 27:
+            self.selected_list_item = 0
+            self.state = 2
+
+    def process_input(self, key: int) -> None:
+        if key in [ord('q'), ord('Q')] and self.editing is False:
+            raise ExitCurses("Exiting")
+
+        else:
+            if self.state == 0:
+                self.process_input_basic_info(key)
+
+            elif self.state == 1:
+                self.process_input_creating_period_times(key)
+
+            elif self.state == 2:
+                self.process_input_viewing_subjects(key)
+
+            elif self.state == 3:
+                self.process_input_editing_subject(key)
+
+            else:
+                raise ExitCurses("Invalid state")
+
+    def display_basic_info(self) -> None:
+        self.list_items = [
+            (f"Timetable Name: {self.input_buffer[0]}", "editor", "name"),
+            (f"Number of Periods per Day (3 - 6): {self.input_buffer[1]}", "editor", "periods"),
+            (f"Include Period Zero [{'x' if self.include_period_zero else ' '}]", "period_zero"),
+            ("Next", "Next"),
+            ("Back", "Back"),
+        ]
+
+        self.list_size = len(self.list_items)
+        self.display_list()
+
+    def display_creating_period_times(self) -> None:
+        self.list_items = []
+
+        start_index: int = int(not self.include_period_zero)
+
+        for i in range(self.num_periods):
+            self.list_items.append((f"Period {i + start_index}", "title"))
+            self.list_items.append((f"Start: {self.input_buffer[2 * i]}", "editor", "start"))
+            self.list_items.append((f"End: {self.input_buffer[2 * i + 1]}", "editor", "end"))
+
+        self.list_items.append(("Next", "Next"))
+        self.list_items.append(("Back", "Back"))
+
+        self.list_size = len(self.list_items)
+        self.display_list()
+
+    def display_viewing_subjects(self) -> None:
+        self.list_items = []
+
+        for subject in self.subjects:
+            self.list_items.append((f"{subject.name}", subject))
+
+        self.list_items.append(("Create New", "New"))
+        self.list_items.append(("Next", "Next"))
+        self.list_items.append(("Back", "Back"))
+
+        self.display_list()
+
+    def display_editing_subject(self) -> None:
+        self.list_items = []
+
+        self.list_items = [
+            (f"Name: {self.input_buffer[0]}", "name"),
+            (f"Teacher: {self.input_buffer[1]}", "teacher"),
+            ("Delete", "Delete"),
+            (f"Save and Exit", "save"),
+            (f"Back", "Back"),
+        ]
+
     def display(self) -> None:
-        pass
+        self.panel.top()
+        self.panel.show()
+        self.window.clear()
+
+        while True:
+            self.window.clear()
+            if self.state == -1:
+                self.exit()
+                return
+
+            if self.state == 0:
+                self.display_basic_info()
+
+            elif self.state == 1:
+                self.display_creating_period_times()
+
+            elif self.state == 2:
+                self.display_viewing_subjects()
+
+            elif self.state == 3:
+                self.display_editing_subject()
+
+            self.window.addstr(0, 2, self.title)
+            self.window.addstr(self.height - 1, 2, self.shortcut_info)
+            self.window.refresh()
+
+            key = self.window.getch()
+
+            self.process_input(key)
 
 
 class SubjectEditMenu(ListMenu):
@@ -897,156 +1200,15 @@ class SubjectEditMenu(ListMenu):
                     self.refresh_items()
 
 
-class SubjectCreatorMenu(ListMenu):
-    def __init__(self, stdscreen: curses.window) -> None:
-        self.subjects: list[Subject] = []
-        self.stdscreen: curses.window = stdscreen
-
-        items: list[tuple] = [
-            ("Create New", "create new"),
-        ]
-
-        super().__init__("Subject Creator", items, stdscreen)
-
-    def refresh_items(self) -> None:
-        items: list[tuple] = []
-
-        for subject in self.subjects:
-            items.append((f"{subject.name}", subject))
-
-        items.append(("Create New", "create new"))
-        items.append(("Exit", "Exit"))
-
-        self.items = items
-
-    def display(self) -> None:
-        self.panel.top()
-        self.panel.show()
-        self.window.clear()
-
-        while True:
-            self.display_items()
-
-            key = self.window.getch()
-
-            if key in [curses.KEY_ENTER, ord("\n")]:
-                if self.position == len(self.items) - 1:
-                    self.exit()
-                    return
-
-                elif self.position == len(self.items) - 2:
-                    subject_edit_menu = SubjectEditMenu(None, self.stdscreen)
-                    new_subject: Subject | None = subject_edit_menu.display()
-
-                    if new_subject is not None:
-                        self.subjects.append(new_subject)
-                        self.refresh_items()
-
-                else:
-                    subject_edit_menu = SubjectEditMenu(self.subjects[self.position],
-                                                        self.stdscreen)
-
-                    new_subject: Subject | None = subject_edit_menu.display()
-
-                    if new_subject is not None:
-                        self.subjects[self.position] = new_subject
-
-                    self.refresh_items()
-
-            elif key == curses.KEY_UP:
-                self.navigate(-1)
-
-            elif key == curses.KEY_DOWN:
-                self.navigate(1)
-
-
-class PeriodTimeSelectorMenu(ListMenu):
-    def __init__(self, stdscreen: curses.window) -> None:
-        self.stdscreen: curses.window = stdscreen
-
-        self.max_input_size = 4
-
-        self.input_buffer: list[list[str]] = []
-        items: list[tuple] = []
-
-        # for i in range(timetable_factory.period_count):
-        #    self.input_buffer.append(["", ""])
-        #    items.append((f"Period {i}", i))
-        #    items.append((f"Start Time: {self.input_buffer[i][0]}", i))
-        #    items.append((f"End Time: {self.input_buffer[i][1]}", i))
-
-        items.append(("Next", "next"))
-
-        super().__init__("Enter Period Times", items, self.stdscreen)
-
-    def refresh_items(self) -> None:
-        items: list[tuple] = []
-
-        # for i in range(self.timetable_factory.period_count):
-        #    self.input_buffer.append(["", ""])
-        #    items.append((f"Period {i}", i))
-        #    items.append((f"Start Time: {self.input_buffer[i][0]}", i))
-        #    items.append((f"End Time: {self.input_buffer[i][1]}", i))
-
-        items.append(("Next", "next"))
-        items.append(("Exit", "Exit"))
-
-        self.items = items
-
-    def process_input(self, key: int, current: str) -> str:
-        if ord('0') <= key <= ord('9') and len(current) < self.max_input_size:
-            return current + chr(key)
-
-        elif key in [curses.KEY_BACKSPACE, 127] and len(current) > 0:
-            return current[:-1]
-
-        return current
-
-    def display(self) -> None:
-        self.panel.top()
-        self.panel.show()
-        self.window.clear()
-
-        while True:
-            self.display_items()
-
-            key = self.window.getch()
-
-            if key in [curses.KEY_ENTER, ord("\n")]:
-                if self.position == len(self.items) - 1:
-                    self.exit()
-                    return
-
-                elif self.position == len(self.items) - 2:
-                    curses.beep()
-
-            elif key == curses.KEY_UP:
-                self.navigate(-1)
-
-            elif key == curses.KEY_DOWN:
-                self.navigate(1)
-
-            else:
-                if self.position % 3 == 0:
-                    pass
-
-                else:
-                    index: int = self.position // 3
-
-                    new_time = self.process_input(key, self.input_buffer[index][self.position % 3 - 1])
-                    self.input_buffer[index][self.position % 3 - 1] = new_time
-                    self.refresh_items()
-
-
 class App:
     def __init__(self, stdscreen: curses.window) -> None:
-        self.current_timetable: TimeTable | None = None
+        self.current_timetable: Timetable | None = None
 
-        self.screen = stdscreen
+        self.screen: curses.window = stdscreen
         curses.curs_set(0)
 
         curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
-        curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLUE)
+        curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLUE)
         curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_BLACK)
         curses.init_pair(4, curses.COLOR_RED, curses.COLOR_WHITE)
 
@@ -1065,16 +1227,11 @@ class App:
 
         main_menu_items = [
             ("Open Existing", files_menu.display),
-            ("Create New", curses.beep),
+            ("Create New", self.create_new_timetable),
         ]
+
         main_menu = ListMenu("Open an existing timetable or create a new one", main_menu_items, self.screen)
         main_menu.display()
-
-    def open_file(self, filename: str) -> None:
-        self.load_file(filename)
-        if self.current_timetable is not None:
-            timetable_menu = TimetableMenu(self.current_timetable, self.screen)
-            timetable_menu.display()
 
     def load_file(self, filename: str) -> None:
         with open(filename) as f:
@@ -1092,8 +1249,7 @@ class App:
             subjects_raw: dict[str, dict[str, str]] = json_data["subjects"]
             period_times_raw: dict[str, dict[str, str]] = json_data["period_times"]
         except KeyError:
-            print("Invalid configuration (Missing Data)")
-            raise InvalidDataException("Data field not found")
+            raise InvalidDataException("Invalid configuration (Missing Data)")
 
         subjects: dict[str, Subject] = {}
         for subject_id, subject_raw in subjects_raw.items():
@@ -1111,7 +1267,7 @@ class App:
             for period_id, val in day.items():
                 subject: Subject | None = subjects.get(val.get("subject"))
                 room: str | None = val.get("room")
- 
+
                 if subject is None or room is None:
                     raise InvalidDataException(f"{period_id} has no subject or room for day {day}")
 
@@ -1131,13 +1287,23 @@ class App:
             period_time_struct = PeriodTimeStruct(name, start_time, end_time)
             period_times[period_num] = period_time_struct
 
-        self.current_timetable = TimeTable(periods, subjects, period_times, timetable_name, filename)
+        self.current_timetable = Timetable(periods, subjects, period_times, timetable_name, filename)
+
+    def open_file(self, filename: str) -> None:
+        self.load_file(filename)
+        if self.current_timetable is not None:
+            timetable_menu = TimetableMenu(self.current_timetable, self.screen)
+            timetable_menu.display()
+
+    def create_new_timetable(self) -> None:
+        timetable_creator_menu = TimetableCreatorMenu(self.screen)
+        timetable_creator_menu.display()
 
 
 if __name__ == "__main__":
     try:
         # Makes the terminal reset properly if it crashes for whatever reason
-        # If this is omitted, crashing will result in the curses content remaining on the screen which is not ideal
+        # If this is omitted, crashing will result in the curses content remaining on the screen which is not wanted
         curses.wrapper(App)
 
     except ExitCurses as e:

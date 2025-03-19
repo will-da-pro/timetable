@@ -1,0 +1,38 @@
+{
+    "name": "2025 Timetable",
+    "timetable": [
+        {},
+        {},
+        {},
+        {},
+        {}
+    ],
+    "subjects": {},
+    "period_times": {
+        "0": {
+            "name": "Period 0",
+            "start": "0800",
+            "end": "0845"
+        },
+        "1": {
+            "name": "Period 1",
+            "start": "0905",
+            "end": "1020"
+        },
+        "2": {
+            "name": "Period 2",
+            "start": "1045",
+            "end": "1200"
+        },
+        "3": {
+            "name": "Period 3",
+            "start": "1205",
+            "end": "1320"
+        },
+        "4": {
+            "name": "Period 4",
+            "start": "1400",
+            "end": "1515"
+        }
+    }
+}
