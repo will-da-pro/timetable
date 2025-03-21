@@ -49,7 +49,7 @@ class Subject:
     teacher: str
 
     def __str__(self) -> str:
-        return f"Period Type - name: {self.name}, teacher: {self.teacher}"
+        return f"{self.name} | {self.teacher}"
 
 
 @dataclass
@@ -772,7 +772,7 @@ class TimetableMenu(Menu):
         self.list_items = []
 
         for subject in self.timetable.subjects.values():
-            self.list_items.append((subject.name, subject))
+            self.list_items.append((str(subject), subject))
 
         self.list_items.append(("Back", "back"))
 
@@ -788,7 +788,10 @@ class TimetableMenu(Menu):
             self.create_side_info_windows()
 
         while True:
+            self.title = f"{self.timetable.name}: {self.states.get(self.state)}"
+
             self.window.clear()
+
             if self.state == -1:
                 self.exit()
                 return
@@ -1143,7 +1146,7 @@ class TimetableCreatorMenu(Menu):
         self.list_items = []
 
         for subject in self.subjects.values():
-            self.list_items.append((f"{subject.name}", subject))
+            self.list_items.append((str(subject), subject))
 
         self.list_items.append(("Create New", "New"))
         self.list_items.append(("Create Timetable", "Create"))
@@ -1170,7 +1173,10 @@ class TimetableCreatorMenu(Menu):
         self.window.clear()
 
         while True:
+            self.title = f"Creating Timetable: {self.states.get(self.state)}"
+
             self.window.clear()
+
             if self.state == -1:
                 self.exit()
                 return
