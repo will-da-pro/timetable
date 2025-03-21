@@ -1430,3 +1430,6 @@ if __name__ == "__main__":
     except InvalidDataException as e:
         print("Error: Invalid JSON Data!")
         print(e)
+
+    except curses.error:
+        print("Terminal to small! Make sure you are running it in full screen!")
