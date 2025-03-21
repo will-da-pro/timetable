@@ -271,6 +271,30 @@ class PeriodTimeWindow(ContentWindow):
         self.border_window.refresh()
 
 
+class TempPopupWindow(ContentWindow):
+    def __init__(self, message: str, stdscreen: curses.window) -> None:
+        self.message: str = message
+        self.secondary_message: str = "Any key to continue..."
+
+        width: int = max(len(self.message), len(self.secondary_message)) + 4
+        height: int = 4
+
+        x_pos: int = (curses.COLS - width) // 2
+        y_pos: int = (curses.LINES - height) // 2
+
+        super().__init__(width, height, x_pos, y_pos, stdscreen)
+
+    def display(self) -> None:
+        self.window.erase()
+
+        self.window.addstr(0, 1, self.message)
+        self.window.addstr(1, 1, self.secondary_message)
+
+        self.window.refresh()
+
+        self.window.getch()
+
+
 # Menus
 
 
@@ -697,8 +721,9 @@ class TimetableMenu(Menu):
 
         elif key in [ord('s'), ord('S')] and self.editing is False:
             self.timetable.save_file()
-            self.stdscreen.addstr(curses.LINES - 1, 1, "Successfully saved")
-            self.stdscreen.refresh()
+
+            saved_popup = TempPopupWindow("Successfully Saved Timetable", self.stdscreen)
+            saved_popup.display()
 
         else:
             if self.state == 0:
