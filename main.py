@@ -842,8 +842,10 @@ class TimetableCreatorMenu(Menu):
 
         self.period_times = {}
 
+        start_index: int = int(not self.include_period_zero)
+
         for index in range(len(self.input_buffer) // 2):
-            self.period_times[str(index)] = PeriodTimeStruct(f"Period {index}",
+            self.period_times[str(index)] = PeriodTimeStruct(f"Period {index + start_index}",
                                                              self.input_buffer[index * 2],
                                                              self.input_buffer[index * 2 + 1])
 
