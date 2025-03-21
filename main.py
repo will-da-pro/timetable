@@ -4,12 +4,13 @@
 
 import json
 import curses
-import os
 from curses import panel
+import os
 from abc import ABC, abstractmethod
 import glob
 from dataclasses import dataclass
 from random import randint
+import argparse
 
 
 # Exception Handling
@@ -27,6 +28,15 @@ class ExitCurses(Exception):
 class InvalidDataException(Exception):
     """
     Raised when invalid JSON data is encountered.
+    """
+
+    def __init__(self, message: str):
+        self.message: str = message
+
+
+class InvalidFileException(Exception):
+    """
+    Raised when invalid JSON file is encountered.
     """
 
     def __init__(self, message: str):
@@ -1312,7 +1322,7 @@ class SubjectEditMenu(ListMenu):
 
 
 class App:
-    def __init__(self, stdscreen: curses.window) -> None:
+    def __init__(self, stdscreen: curses.window, opts) -> None:
         self.current_timetable: Timetable | None = None
 
         self.screen: curses.window = stdscreen
@@ -1324,6 +1334,14 @@ class App:
         curses.init_pair(4, curses.COLOR_RED, curses.COLOR_WHITE)
 
         stdscreen.bkgd(' ', curses.color_pair(2))
+
+        file: str | None = opts.opt_file
+
+        if file is not None:
+            if not os.path.isfile(file):
+                raise InvalidFileException(f"File '{file}' does not exist")
+
+            self.open_file(file)
 
         self.check_data_dir()
 
@@ -1419,10 +1437,16 @@ class App:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Simple timetable creator and viewer written in Python')
+    parser.add_argument('opt_file', type=str, nargs='?',
+                        help='Timetable file path to view')
+
+    opts = parser.parse_args()
+
     try:
         # Makes the terminal reset properly if it crashes for whatever reason
         # If this is omitted, crashing will result in the curses content remaining on the screen which is not wanted
-        curses.wrapper(App)
+        curses.wrapper(App, opts)
 
     except ExitCurses as e:
         print(e)
@@ -1430,6 +1454,9 @@ if __name__ == "__main__":
     except InvalidDataException as e:
         print("Error: Invalid JSON Data!")
         print(e)
+
+    except InvalidFileException as e:
+        parser.error(str(e))
 
     except curses.error:
         print("Terminal to small! Make sure you are running it in full screen!")
