@@ -4,6 +4,7 @@
 
 import json
 import curses
+import os
 from curses import panel
 from abc import ABC, abstractmethod
 import glob
@@ -1293,6 +1294,8 @@ class App:
 
         stdscreen.bkgd(' ', curses.color_pair(2))
 
+        self.check_data_dir()
+
         files = glob.glob("data/*.json")
         file_items = []
         for file in files:
@@ -1311,6 +1314,11 @@ class App:
 
         main_menu = ListMenu("Open an existing timetable or create a new one", main_menu_items, self.screen)
         main_menu.display()
+
+    @staticmethod
+    def check_data_dir() -> None:
+        if not os.path.exists("data"):
+            os.makedirs("data")
 
     def load_file(self, filename: str) -> None:
         with open(filename) as f:
