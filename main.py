@@ -3,16 +3,13 @@
 # Copyright 2025 William D'Olier
 
 import json
-# import re
 import curses
 from curses import panel
 from abc import ABC, abstractmethod
 import glob
 from dataclasses import dataclass
+from random import randint
 
-
-# Time regex
-# ^([0-1][0-9]|2[0-3])[0-5][0-9]$
 
 # Exception Handling
 
@@ -156,13 +153,16 @@ class Timetable:
 
             period_times_raw[period_times_index] = {"name": name, "start": start_time, "end": end_time}
 
+        # Adds all data to one dict
         json_data["name"] = self.name
         json_data["timetable"] = timetable_raw
         json_data["subjects"] = subjects_raw
         json_data["period_times"] = period_times_raw
 
+        # Turns said dict into JSON
         json_object = json.dumps(json_data, indent=4)
 
+        # Writes JSON data to file
         with open(self.filename, "w") as outfile:
             outfile.write(json_object)
 
@@ -318,7 +318,6 @@ class Menu(ABC):
         self.window.bkgd(' ', curses.color_pair(1))
 
         self.selected_list_item: int = 0
-        self.list_size: int = 0
 
         self.list_items: list[tuple] = []
 
@@ -338,8 +337,8 @@ class Menu(ABC):
         if self.selected_list_item < 0:
             self.selected_list_item = 0
 
-        elif self.selected_list_item >= self.list_size:
-            self.selected_list_item = self.list_size - 1
+        elif self.selected_list_item >= len(self.list_items):
+            self.selected_list_item = len(self.list_items) - 1
 
         if self.list_items[self.selected_list_item][1] == "editor":
             self.editing = True
@@ -739,8 +738,6 @@ class TimetableMenu(Menu):
             ("Back", "back"),
         ]
 
-        self.list_size = len(self.list_items)
-
         self.display_list()
 
     def display_selecting_subject(self) -> None:
@@ -752,8 +749,6 @@ class TimetableMenu(Menu):
             self.list_items.append((subject.name, subject))
 
         self.list_items.append(("Back", "back"))
-
-        self.list_size = len(self.list_items)
 
         self.display_list()
 
@@ -825,7 +820,21 @@ class TimetableCreatorMenu(Menu):
         self.include_period_zero: bool = False
 
         self.period_times: dict[str, PeriodTimeStruct] = {}
-        self.subjects: list[Subject] = []
+        self.subjects: dict[str, Subject] = {}
+
+        self.subject_editing_id: str | None = None
+
+        self.timetable: Timetable | None = None
+
+    def create_timetable(self) -> None:
+        periods: dict[int, dict[str, Period]] = {}
+
+        for i in range(6):
+            periods[i] = {}
+
+        filename: str = f"data/{self.timetable_name.lower().replace(' ', '_')}.json"
+
+        self.timetable = Timetable(periods, self.subjects, self.period_times, self.timetable_name, filename)
 
     def process_period_times(self) -> None:
         if self.state != 1:
@@ -879,14 +888,14 @@ class TimetableCreatorMenu(Menu):
                         len(self.input_buffer[0]) < self.max_input_size):
                     self.input_buffer[0] += chr(key)
 
-                elif key in [curses.KEY_BACKSPACE, 127] and len(self.input_buffer) > 0:
+                elif key in [curses.KEY_BACKSPACE, 127] and len(self.input_buffer[0]) > 0:
                     self.input_buffer[0] = self.input_buffer[0][:-1]
 
             elif self.list_items[self.selected_list_item][2] == "periods":
                 if ord('3') <= key <= ord('6') and len(self.input_buffer[1]) < 1:
                     self.input_buffer[1] += chr(key)
 
-                elif key in [curses.KEY_BACKSPACE, 127] and len(self.input_buffer) > 0:
+                elif key in [curses.KEY_BACKSPACE, 127] and len(self.input_buffer[1]) > 0:
                     self.input_buffer[1] = self.input_buffer[1][:-1]
 
     def process_input_creating_period_times(self, key: int) -> None:
@@ -898,10 +907,10 @@ class TimetableCreatorMenu(Menu):
                 self.state = 0
 
             elif self.list_items[self.selected_list_item][1] == "Next":
+                self.process_period_times()
+
                 self.input_buffer = []
                 self.selected_list_item = 0
-
-                self.process_period_times()
 
                 self.state = 2
 
@@ -948,23 +957,39 @@ class TimetableCreatorMenu(Menu):
                 self.state = 1
 
             elif self.list_items[self.selected_list_item][1] == "New":
-                subject_edit_menu = SubjectEditMenu(None, self.stdscreen)
-                new_subject: Subject | None = subject_edit_menu.display()
+                self.input_buffer = [
+                    "",
+                    ""
+                ]
 
-                if new_subject is not None:
-                    self.subjects.append(new_subject)
+                self.selected_list_item = 0
 
-            elif self.list_items[self.selected_list_item][1] == "Next":
-                curses.beep()
+                new_id: str = str(randint(0, 9999999999))
+
+                while self.subjects.get(new_id) is not None:
+                    new_id = str(randint(0, 9999999999))
+
+                self.subject_editing_id = new_id
+
+                self.state = 3
+
+            elif self.list_items[self.selected_list_item][1] == "Create":
+                self.create_timetable()
+
+                if self.timetable is not None:
+                    timetable_view_menu = TimetableMenu(self.timetable, self.stdscreen)
+
+                    timetable_view_menu.display()
 
             else:
-                subject_edit_menu = SubjectEditMenu(self.subjects[self.selected_list_item],
-                                                    self.stdscreen)
+                self.subject_editing_id: str = list(self.subjects.keys())[self.selected_list_item]
 
-                new_subject: Subject | None = subject_edit_menu.display()
+                self.input_buffer = [
+                    self.subjects[self.subject_editing_id].name,
+                    self.subjects[self.subject_editing_id].teacher
+                ]
 
-                if new_subject is not None:
-                    self.subjects[self.selected_list_item] = new_subject
+                self.state = 3
 
         if key == 27:
             self.input_buffer = []
@@ -984,9 +1009,61 @@ class TimetableCreatorMenu(Menu):
             self.navigate_list(1)
 
     def process_input_editing_subject(self, key: int) -> None:
-        if key == 27:
+        if key in [curses.KEY_ENTER, ord("\n")]:
+            if self.list_items[self.selected_list_item][1] == "Delete":
+                if self.subjects.get(self.subject_editing_id) is not None:
+                    del self.subjects[self.subject_editing_id]
+
+                self.input_buffer = []
+                self.selected_list_item = 0
+                self.state = 2
+
+            elif self.list_items[self.selected_list_item][1] == "Save":
+                if self.input_buffer[0] == "":
+                    curses.beep()
+                    return
+
+                new_subject = Subject(self.subject_editing_id, self.input_buffer[0], self.input_buffer[1])
+
+                self.subjects[self.subject_editing_id] = new_subject
+
+                self.input_buffer = []
+                self.selected_list_item = 0
+
+                self.state = 2
+
+            elif self.list_items[self.selected_list_item][1] == "Back":
+                self.input_buffer = []
+                self.selected_list_item = 0
+
+                self.state = 2
+
+        elif key == 27:
             self.selected_list_item = 0
             self.state = 2
+
+        elif key == curses.KEY_UP:
+            self.navigate_list(-1)
+
+        elif key == curses.KEY_DOWN:
+            self.navigate_list(1)
+
+        elif self.list_items[self.selected_list_item][1] == "editor":
+            if self.list_items[self.selected_list_item][2] == "name":
+                if ((ord('!') <= key <= ord('~') or key == ord(' ')) and
+                        len(self.input_buffer[0]) < self.max_input_size):
+                    self.input_buffer[0] += chr(key)
+
+                elif key in [curses.KEY_BACKSPACE, 127] and len(self.input_buffer[0]) > 0:
+                    self.input_buffer[0] = self.input_buffer[0][:-1]
+
+            elif self.list_items[self.selected_list_item][2] == "teacher":
+                if ((ord('!') <= key <= ord('~') or key == ord(' ')) and
+                        len(self.input_buffer[1]) < self.max_input_size):
+                    self.input_buffer[1] += chr(key)
+
+                elif key in [curses.KEY_BACKSPACE, 127] and len(self.input_buffer[1]) > 0:
+                    self.input_buffer[1] = self.input_buffer[1][:-1]
 
     def process_input(self, key: int) -> None:
         if key in [ord('q'), ord('Q')] and self.editing is False:
@@ -1017,7 +1094,6 @@ class TimetableCreatorMenu(Menu):
             ("Back", "Back"),
         ]
 
-        self.list_size = len(self.list_items)
         self.display_list()
 
     def display_creating_period_times(self) -> None:
@@ -1027,23 +1103,22 @@ class TimetableCreatorMenu(Menu):
 
         for i in range(self.num_periods):
             self.list_items.append((f"Period {i + start_index}", "title"))
-            self.list_items.append((f"Start: {self.input_buffer[2 * i]}", "editor", "start"))
-            self.list_items.append((f"End: {self.input_buffer[2 * i + 1]}", "editor", "end"))
+            self.list_items.append((f"Start Time: {self.input_buffer[2 * i]}", "editor", "start"))
+            self.list_items.append((f"End Time: {self.input_buffer[2 * i + 1]}", "editor", "end"))
 
         self.list_items.append(("Next", "Next"))
         self.list_items.append(("Back", "Back"))
 
-        self.list_size = len(self.list_items)
         self.display_list()
 
     def display_viewing_subjects(self) -> None:
         self.list_items = []
 
-        for subject in self.subjects:
+        for subject in self.subjects.values():
             self.list_items.append((f"{subject.name}", subject))
 
         self.list_items.append(("Create New", "New"))
-        self.list_items.append(("Next", "Next"))
+        self.list_items.append(("Create Timetable", "Create"))
         self.list_items.append(("Back", "Back"))
 
         self.display_list()
@@ -1052,12 +1127,14 @@ class TimetableCreatorMenu(Menu):
         self.list_items = []
 
         self.list_items = [
-            (f"Name: {self.input_buffer[0]}", "name"),
-            (f"Teacher: {self.input_buffer[1]}", "teacher"),
+            (f"Name: {self.input_buffer[0]}", "editor", "name"),
+            (f"Teacher: {self.input_buffer[1]}", "editor", "teacher"),
             ("Delete", "Delete"),
-            (f"Save and Exit", "save"),
+            (f"Save and Exit", "Save"),
             (f"Back", "Back"),
         ]
+
+        self.display_list()
 
     def display(self) -> None:
         self.panel.top()
