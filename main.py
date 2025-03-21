@@ -798,8 +798,6 @@ class TimetableMenu(Menu):
             self.create_side_info_windows()
 
         while True:
-            self.title = f"{self.timetable.name}: {self.states.get(self.state)}"
-
             self.window.clear()
 
             if self.state == -1:
@@ -817,6 +815,8 @@ class TimetableMenu(Menu):
 
             elif self.state == 3:
                 self.display_selecting_subject()
+
+            self.title = f"{self.timetable.name}: {self.states.get(self.state)}"
 
             self.window.addstr(0, 2, self.title)
             self.window.addstr(self.height - 1, 2, self.shortcut_info)
@@ -1183,8 +1183,6 @@ class TimetableCreatorMenu(Menu):
         self.window.clear()
 
         while True:
-            self.title = f"Creating Timetable: {self.states.get(self.state)}"
-
             self.window.clear()
 
             if self.state == -1:
@@ -1203,6 +1201,8 @@ class TimetableCreatorMenu(Menu):
             elif self.state == 3:
                 self.display_editing_subject()
 
+            self.title = f"Creating Timetable: {self.states.get(self.state)}"
+
             self.window.addstr(0, 2, self.title)
             self.window.addstr(self.height - 1, 2, self.shortcut_info)
             self.window.refresh()
@@ -1212,117 +1212,8 @@ class TimetableCreatorMenu(Menu):
             self.process_input(key)
 
 
-class SubjectEditMenu(ListMenu):
-    def __init__(self, subject: Subject | None, stdscreen):
-        self.original_subject: Subject | None = subject
-        self.subject: Subject | None = subject
-
-        self.subject_id: str | None = None
-        self.name: str | None = None
-        self.teacher: str | None = None
-
-        self.max_input_size = 20
-
-        if self.original_subject is not None:
-            self.subject_id = self.original_subject.subject_id
-            self.name = self.original_subject.name
-            self.teacher = self.original_subject.teacher
-
-        else:
-            self.subject_id = ""
-            self.name = ""
-            self.teacher = ""
-
-        items: list[tuple] = [
-            (f"Name: {self.name}", "name"),
-            (f"Teacher: {self.teacher}", "teacher"),
-            ("Delete", "Delete"),
-            (f"Save and Exit", "save and exit"),
-        ]
-
-        super().__init__("Edit Subject", items, stdscreen)
-
-    def refresh_items(self):
-        items: list[tuple] = [
-            (f"Name: {self.name}", "name"),
-            (f"Teacher: {self.teacher}", "teacher"),
-            ("Delete", "Delete"),
-            (f"Save and Exit", "save and exit"),
-            ("Exit", "Exit"),
-        ]
-
-        self.items = items
-
-    def generate_subject(self) -> None:
-        if len(self.subject_id) == 0 or len(self.name) == 0 or len(self.teacher) == 0:
-            self.subject = None
-
-        elif self.subject_id is not None and self.name is not None and self.teacher is not None:
-            self.subject = Subject(self.subject_id, self.name, self.teacher)
-
-        else:
-            self.subject = None
-
-    def process_input(self, key: int, current: str) -> str | None:
-        if (ord('!') <= key <= ord('~') or key == ord(' ')) and len(current) < self.max_input_size:
-            return current + chr(key)
-
-        elif key in [curses.KEY_BACKSPACE, 127] and len(current) > 0:
-            return current[:-1]
-
-        return current
-
-    def display(self) -> Subject | None:
-        self.panel.top()
-        self.panel.show()
-        self.window.clear()
-
-        while True:
-            self.display_items()
-
-            key = self.window.getch()
-
-            if key in [curses.KEY_ENTER, ord("\n")]:
-                if self.position == 4:
-                    self.exit()
-
-                    return self.original_subject
-
-                elif self.position == 3:
-                    self.exit()
-
-                    self.generate_subject()
-
-                    if self.subject is not None:
-                        return self.subject
-
-                    else:
-                        curses.beep()
-
-                elif self.position == 2:
-                    self.exit()
-
-                    return None
-
-            elif key == curses.KEY_UP:
-                self.navigate(-1)
-
-            elif key == curses.KEY_DOWN:
-                self.navigate(1)
-
-            else:
-                if self.position == 0:
-                    self.name = self.process_input(key, self.name)
-                    self.subject_id = self.name.lower().replace(" ", "_")
-                    self.refresh_items()
-
-                elif self.position == 1:
-                    self.teacher = self.process_input(key, self.teacher)
-                    self.refresh_items()
-
-
 class App:
-    def __init__(self, stdscreen: curses.window, opts) -> None:
+    def __init__(self, stdscreen: curses.window) -> None:
         self.current_timetable: Timetable | None = None
 
         self.screen: curses.window = stdscreen
@@ -1446,7 +1337,7 @@ if __name__ == "__main__":
     try:
         # Makes the terminal reset properly if it crashes for whatever reason
         # If this is omitted, crashing will result in the curses content remaining on the screen which is not wanted
-        curses.wrapper(App, opts)
+        curses.wrapper(App)
 
     except ExitCurses as e:
         print(e)
