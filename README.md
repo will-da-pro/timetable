@@ -15,6 +15,5 @@ This app is purely terminal based, so can be run without a desktop environment.
 ## Running
 
 ```bash
-source .venv/bin/activate
 ./main.py
 ```
