@@ -309,8 +309,8 @@ class Menu(ABC):
         self.border_window = stdscreen.subwin(height + 2, width + 2, self.y_pos - 1, self.x_pos - 1)
         self.border_window.bkgd(' ', curses.color_pair(1))
         self.border_window.border(0)
-        self.border_window.addch(0, (self.width - len(header)) // 2 - 1, "┤")
-        self.border_window.addch(0, (self.width + len(header)) // 2 + 2, "├")
+        self.border_window.addstr(0, (self.width - len(header)) // 2 - 1, "┤")
+        self.border_window.addstr(0, (self.width + len(header)) // 2 + 2, "├")
         self.border_window.addstr(0, (self.width - len(header)) // 2, f" {header} ", curses.color_pair(4))
         self.border_window.refresh()
 
