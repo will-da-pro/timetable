@@ -305,6 +305,30 @@ class TempPopupWindow(ContentWindow):
         self.window.getch()
 
 
+class HelpWindow(ContentWindow):
+    def __init__(self, message: str, stdscreen: curses.window) -> None:
+        self.message: str = message
+        self.secondary_message: str = "Any key to continue..."
+
+        width: int = max(len(self.message), len(self.secondary_message)) + 4
+        height: int = 4
+
+        x_pos: int = (curses.COLS - width) // 2
+        y_pos: int = (curses.LINES - height) // 2
+
+        super().__init__(width, height, x_pos, y_pos, stdscreen)
+
+    def display(self) -> None:
+        self.window.erase()
+
+        self.window.addstr(0, 1, self.message)
+        self.window.addstr(1, 1, self.secondary_message)
+
+        self.window.refresh()
+
+        self.window.getch()
+
+
 # Menus
 
 
@@ -361,10 +385,10 @@ class Menu(ABC):
     def display_list(self) -> None:
         for index, item in enumerate(self.list_items):
             if index == self.selected_list_item:
-                self.window.addstr(index + 2, 1, f"{index + 1}. {item[0]}", curses.A_REVERSE)
+                self.window.addstr(index + 2, 1, item[0], curses.A_REVERSE)
 
             else:
-                self.window.addstr(index + 2, 1, f"{index + 1}. {item[0]}")
+                self.window.addstr(index + 2, 1, item[0])
 
     def navigate_list(self, change: int) -> None:
         self.selected_list_item += change
@@ -415,7 +439,7 @@ class ListMenu(Menu):
 
         self.items.append(("Exit", "Exit"))
 
-        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit"
+        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [return] Select"
 
     def navigate(self, position_change) -> None:
         self.position += position_change
@@ -444,7 +468,7 @@ class ListMenu(Menu):
             else:
                 mode = curses.A_NORMAL
 
-            msg: str = f"{index}. {item[0]}"
+            msg: str = item[0]
             self.window.addstr(2 + index, 1, msg, mode)
 
     def display(self) -> None:
@@ -513,7 +537,7 @@ class TimetableMenu(Menu):
 
         self.timetable = timetable
         self.days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [s] Save Timetable"
+        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [s] Save Timetable, [return] Select"
 
         self.period_windows: list[PeriodWindow] = []
         self.side_info_windows: list[PeriodTimeWindow] = []
@@ -680,7 +704,8 @@ class TimetableMenu(Menu):
                     self.state = 1
 
                 else:
-                    curses.beep()
+                    popup_window = TempPopupWindow("Please select a subject.", self.stdscreen)
+                    popup_window.display()
 
             elif self.list_items[self.selected_list_item][1] == "back":
                 self.state = 1
@@ -759,12 +784,12 @@ class TimetableMenu(Menu):
         self.render_timetable()
 
     def display_editing(self) -> None:
-        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [s] Save Timetable"
+        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [s] Save Timetable, [return] Select"
 
         self.render_timetable(highlighted=(self.selected_period_x, self.selected_period_y))
 
     def display_editing_period(self) -> None:
-        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [s] Save Timetable"
+        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [s] Save Timetable, [return] Select"
 
         self.list_items = [
             (f"Subject: {self.selected_subject.name if self.selected_subject is not None else 'None'}", "subject"),
@@ -777,7 +802,7 @@ class TimetableMenu(Menu):
         self.display_list()
 
     def display_selecting_subject(self) -> None:
-        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [s] Save Timetable"
+        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [s] Save Timetable, [return] Select"
 
         self.list_items = []
 
@@ -846,7 +871,7 @@ class TimetableCreatorMenu(Menu):
         self.panel.hide()
         panel.update_panels()
 
-        self.shortcut_info: str = "Shortcuts: [esc] Back, [q] Quit"
+        self.shortcut_info: str = "Shortcuts: [esc] Back, [q] Quit, [return] Select"
 
         self.input_buffer: list[str] = ["", ""]
         self.max_input_size: int = 20
@@ -894,8 +919,13 @@ class TimetableCreatorMenu(Menu):
                 self.state = -1
 
             elif self.list_items[self.selected_list_item][1] == "Next":
-                if self.input_buffer[0] == "" or self.input_buffer[1] == "":
-                    curses.beep()
+                if self.input_buffer[0] == "":
+                    popup_window = TempPopupWindow("Please enter a name for the timetable.", self.stdscreen)
+                    popup_window.display()
+
+                elif self.input_buffer[1] == "":
+                    popup_window = TempPopupWindow("Please select the number of periods", self.stdscreen)
+                    popup_window.display()
 
                 else:
                     self.timetable_name = self.input_buffer[0]
@@ -910,9 +940,6 @@ class TimetableCreatorMenu(Menu):
                     self.selected_list_item = 0
 
                     self.state = 1
-
-            elif self.list_items[self.selected_list_item][1] == "period_zero":
-                self.include_period_zero = not self.include_period_zero
 
         elif key == 27:
             self.state = -1
@@ -938,6 +965,13 @@ class TimetableCreatorMenu(Menu):
 
                 elif key in [curses.KEY_BACKSPACE, 127] and len(self.input_buffer[1]) > 0:
                     self.input_buffer[1] = self.input_buffer[1][:-1]
+
+        elif self.list_items[self.selected_list_item][1] == "period_zero":
+            if key in [ord("y"), ord("Y")]:
+                self.include_period_zero = True
+
+            elif key in [ord("n"), ord("N")]:
+                self.include_period_zero = False
 
     def process_input_creating_period_times(self, key: int) -> None:
         if key in [curses.KEY_ENTER, ord("\n")]:
@@ -1061,7 +1095,9 @@ class TimetableCreatorMenu(Menu):
 
             elif self.list_items[self.selected_list_item][1] == "Save":
                 if self.input_buffer[0] == "":
-                    curses.beep()
+                    popup_window = TempPopupWindow("Please enter a name for the period.", self.stdscreen)
+                    popup_window.display()
+
                     return
 
                 new_subject = Subject(self.subject_editing_id, self.input_buffer[0], self.input_buffer[1])
@@ -1130,12 +1166,18 @@ class TimetableCreatorMenu(Menu):
         self.list_items = [
             (f"Timetable Name: {self.input_buffer[0]}", "editor", "name"),
             (f"Number of Periods per Day (3 - 6): {self.input_buffer[1]}", "editor", "periods"),
-            (f"Include Period Zero [{'x' if self.include_period_zero else ' '}]", "period_zero"),
+            (f"Include Period Zero (y/n): {'y' if self.include_period_zero else 'n'}", "period_zero"),
             ("Next", "Next"),
             ("Back", "Back"),
         ]
 
         self.display_list()
+
+        if self.editing:
+            self.shortcut_info = "(Editing)"
+
+        else:
+            self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [return] Select"
 
     def display_creating_period_times(self) -> None:
         self.list_items = []
@@ -1152,6 +1194,12 @@ class TimetableCreatorMenu(Menu):
 
         self.display_list()
 
+        if self.editing:
+            self.shortcut_info = "(Editing)"
+
+        else:
+            self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [return] Select"
+
     def display_viewing_subjects(self) -> None:
         self.list_items = []
 
@@ -1163,6 +1211,12 @@ class TimetableCreatorMenu(Menu):
         self.list_items.append(("Back", "Back"))
 
         self.display_list()
+
+        if self.editing:
+            self.shortcut_info = "(Editing)"
+
+        else:
+            self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [return] Select"
 
     def display_editing_subject(self) -> None:
         self.list_items = []
@@ -1176,6 +1230,12 @@ class TimetableCreatorMenu(Menu):
         ]
 
         self.display_list()
+
+        if self.editing:
+            self.shortcut_info = "(Editing)"
+
+        else:
+            self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [return] Select"
 
     def display(self) -> None:
         self.panel.top()
@@ -1213,38 +1273,60 @@ class TimetableCreatorMenu(Menu):
 
 
 class App:
+    """
+    Main class for launching the application.
+    """
+
     def __init__(self, stdscreen: curses.window) -> None:
+        """
+        Initialize and run the application.
+
+        :param stdscreen: The curses window instance.
+        """
+
+        # Timetable to use
         self.current_timetable: Timetable | None = None
 
+        # Curses window instance to use
         self.screen: curses.window = stdscreen
+
+        # Disable cursor visibility
         curses.curs_set(0)
 
+        # Color initialization
         curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
         curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLUE)
         curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_BLACK)
         curses.init_pair(4, curses.COLOR_RED, curses.COLOR_WHITE)
 
+        # Set background color
         stdscreen.bkgd(' ', curses.color_pair(2))
 
+        # Check the data/ directory exists, if not create one
+        self.check_data_dir()
+
+        # Check if the user used the opt_file argument
         file: str | None = opts.opt_file
 
+        # If they did, make sure it exists, then open it
         if file is not None:
             if not os.path.isfile(file):
                 raise InvalidFileException(f"File '{file}' does not exist")
 
             self.open_file(file)
 
-        self.check_data_dir()
-
+        # Search the data/ directory for .json files
         files = glob.glob("data/*.json")
         file_items = []
         for file in files:
             file_items.append((file, self.open_file, file))
 
+        # No .json files found
         if len(file_items) == 0:
             file_items.append(
                 ("No files found! Are you sure they are in the correct directory? (data/[name].json)", curses.beep))
 
+        # Instance of ListMenu for selecting a file to open
         files_menu = ListMenu("Select a file to open", file_items, self.screen)
 
         main_menu_items = [
@@ -1252,15 +1334,29 @@ class App:
             ("Create New", self.create_new_timetable),
         ]
 
+        # ListMenu instance for selecting whether to view or edit a timetable
         main_menu = ListMenu("Open an existing timetable or create a new one", main_menu_items, self.screen)
         main_menu.display()
 
     @staticmethod
     def check_data_dir() -> None:
+        """
+        Checks if the data/ directory exists. If not, creates it.
+
+        :return:
+        """
+
         if not os.path.exists("data"):
             os.makedirs("data")
 
     def load_file(self, filename: str) -> None:
+        """
+        Loads a JSON file from the given path, and turns it into a Timetable object.
+
+        :param filename: The path to the JSON file to load.
+        :return:
+        """
+
         with open(filename) as f:
             try:
                 json_data: dict | None = json.load(f)
