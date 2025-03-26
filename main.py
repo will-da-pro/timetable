@@ -383,6 +383,12 @@ class Menu(ABC):
         self.editing: bool = False
 
     def display_list(self) -> None:
+        if self.list_items[self.selected_list_item][1] == "editor":
+            self.editing = True
+
+        else:
+            self.editing = False
+
         for index, item in enumerate(self.list_items):
             if index == self.selected_list_item:
                 self.window.addstr(index + 2, 1, item[0], curses.A_REVERSE)
@@ -398,12 +404,6 @@ class Menu(ABC):
 
         elif self.selected_list_item >= len(self.list_items):
             self.selected_list_item = len(self.list_items) - 1
-
-        if self.list_items[self.selected_list_item][1] == "editor":
-            self.editing = True
-
-        else:
-            self.editing = False
 
     def exit(self) -> None:
         """
@@ -792,7 +792,7 @@ class TimetableMenu(Menu):
         self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [s] Save Timetable, [return] Select"
 
         self.list_items = [
-            (f"Subject: {self.selected_subject.name if self.selected_subject is not None else 'None'}", "subject"),
+            (f"Subject: {self.selected_subject if self.selected_subject is not None else 'None'}", "subject"),
             (f"Room: {self.input_buffer}", "editor"),
             ("Delete", "delete"),
             ("Save and Exit", "save_exit"),
@@ -1206,7 +1206,7 @@ class TimetableCreatorMenu(Menu):
         for subject in self.subjects.values():
             self.list_items.append((str(subject), subject))
 
-        self.list_items.append(("Create New", "New"))
+        self.list_items.append(("Create New Subject", "New"))
         self.list_items.append(("Create Timetable", "Create"))
         self.list_items.append(("Back", "Back"))
 
@@ -1214,6 +1214,9 @@ class TimetableCreatorMenu(Menu):
 
         if self.editing:
             self.shortcut_info = "(Editing)"
+
+        elif isinstance(self.list_items[self.selected_list_item][1], Subject):
+            self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [return] Edit Subject"
 
         else:
             self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [return] Select"
