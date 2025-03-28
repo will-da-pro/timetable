@@ -208,6 +208,7 @@ class ContentWindow(ABC):
         self.x_pos: int = x_pos
         self.y_pos: int = y_pos
 
+        # Separate window for the border
         self.border_window = parent.subwin(height, width, self.y_pos, self.x_pos)
         self.border_window.bkgd(' ', curses.color_pair(1))
         self.border_window.border(0)
@@ -228,11 +229,27 @@ class ContentWindow(ABC):
 
 
 class PeriodWindow(ContentWindow):
+    """
+    Class for a period window with a border which displays the subject, teacher and room.
+    """
+
     def __init__(self, period: Period,
                  width: int, height: int,
                  x_pos: int, y_pos: int,
                  x_index: int, y_index: int,
                  parent) -> None:
+        """
+        Initializes a period window object.
+
+        :param period: The period to render.
+        :param width: The width of the window.
+        :param height: The height of the window.
+        :param x_pos: The x position of the window, relative to the entire screen.
+        :param y_pos: The y position of the window, relative to the entire screen.
+        :param x_index: The day of the period.
+        :param y_index: The index of the period during the day.
+        :param parent: The parent window object.
+        """
 
         super().__init__(width, height, x_pos, y_pos, parent)
 
@@ -262,6 +279,10 @@ class PeriodWindow(ContentWindow):
 
 
 class PeriodTimeWindow(ContentWindow):
+    """
+    Class for period time windows, displaying the start and end time of each period.
+    """
+
     def __init__(self, period_times: PeriodTimeStruct,
                  width: int, height: int,
                  x_pos: int, y_pos: int,
@@ -284,31 +305,17 @@ class PeriodTimeWindow(ContentWindow):
 
 
 class TempPopupWindow(ContentWindow):
+    """
+    A temporary popup window, used for displaying info messages and such.
+    """
+
     def __init__(self, message: str, stdscreen: curses.window) -> None:
-        self.message: str = message
-        self.secondary_message: str = "Any key to continue..."
+        """
+        Initializes a temporary popup window object.
+        :param message: The message to display.
+        :param stdscreen: The parent window object.
+        """
 
-        width: int = max(len(self.message), len(self.secondary_message)) + 4
-        height: int = 4
-
-        x_pos: int = (curses.COLS - width) // 2
-        y_pos: int = (curses.LINES - height) // 2
-
-        super().__init__(width, height, x_pos, y_pos, stdscreen)
-
-    def display(self) -> None:
-        self.window.erase()
-
-        self.window.addstr(0, 1, self.message)
-        self.window.addstr(1, 1, self.secondary_message)
-
-        self.window.refresh()
-
-        self.window.getch()
-
-
-class HelpWindow(ContentWindow):
-    def __init__(self, message: str, stdscreen: curses.window) -> None:
         self.message: str = message
         self.secondary_message: str = "Any key to continue..."
 
@@ -341,7 +348,8 @@ class Menu(ABC):
     Creates a border window, shadow window and main window for rendering content.
     """
     def __init__(self, title: str, stdscreen: curses.window,
-                 width: int = 150, height: int = 40) -> None:
+                 width: int = 150, height: int = 40,
+                 header: str = "TIMETABLE APP") -> None:
         """
         Initializes a menu object.
 
@@ -360,12 +368,12 @@ class Menu(ABC):
 
         self.stdscreen: curses.window = stdscreen
 
+        # A separate window for displaying a black shadow behind the window.
         self.shadow_window = stdscreen.subwin(height + 2, width + 2, self.y_pos, self.x_pos)
         self.shadow_window.bkgd(' ', curses.color_pair(3))
         self.shadow_window.refresh()
 
-        header: str = "TIMETABLE APP"
-
+        # A separate window for displaying a border and header.
         self.border_window = stdscreen.subwin(height + 2, width + 2, self.y_pos - 1, self.x_pos - 1)
         self.border_window.bkgd(' ', curses.color_pair(1))
         self.border_window.border(0)
@@ -374,6 +382,7 @@ class Menu(ABC):
         self.border_window.addstr(0, (self.width - len(header)) // 2, f" {header} ", curses.color_pair(4))
         self.border_window.refresh()
 
+        # The main window for content to be displayed on
         self.window = stdscreen.subwin(height, width, self.y_pos, self.x_pos)
         self.window.keypad(True)
         self.window.bkgd(' ', curses.color_pair(1))
@@ -468,6 +477,7 @@ class QuickListMenu(Menu):
             self.window.erase()
             self.display_list()
             self.window.addstr(self.height - 1, 2, self.shortcut_info)
+            self.window.addstr(0, 2, self.title)
             self.window.refresh()
 
             key = self.window.getch()
@@ -477,6 +487,7 @@ class QuickListMenu(Menu):
                     self.exit()
                     return
 
+                # Check if the second item in the tuple is a function, if so call it with parameters
                 elif isinstance(self.list_items[self.selected_list_item][1], Callable):
                     if len(self.list_items[self.selected_list_item]) <= 2:
                         self.list_items[self.selected_list_item][1]()
@@ -487,6 +498,7 @@ class QuickListMenu(Menu):
             elif key == ord("q"):
                 raise ExitCurses("Exiting")
 
+            # Escape key
             elif key == 27:
                 self.exit()
                 return
@@ -1119,7 +1131,7 @@ class TimetableCreatorMenu(Menu):
                         len(self.input_buffer[0]) < self.max_input_size):
                     self.input_buffer[0] += chr(key)
 
-                elif key in [curses.KEY_BACKSPACE, 127] and len(self.input_buffer[0]) > 0:
+                elif key in [127, curses.KEY_BACKSPACE] and len(self.input_buffer[0]) > 0:
                     self.input_buffer[0] = self.input_buffer[0][:-1]
 
             elif self.list_items[self.selected_list_item][2] == "teacher":
