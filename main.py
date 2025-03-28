@@ -140,7 +140,7 @@ class Timetable:
         period_times_raw: dict[str, dict[str, str]] = {}
 
         # Converts all periods into Python dicts
-        for day_index, day in self.periods.items():
+        for day in self.periods.values():
             day_data: dict[str, dict[str, str]] = {}
 
             for period_index, period in day.items():
@@ -841,7 +841,7 @@ class TimetableMenu(Menu):
             elif self.state == 3:
                 self.display_selecting_subject()
 
-            self.title = f"{self.timetable.name}: {self.states.get(self.state)}"
+            self.title = f"{self.states.get(self.state)} | {self.timetable.name}"
 
             self.window.addstr(0, 2, self.title)
             self.window.addstr(self.height - 1, 2, self.shortcut_info)
@@ -1069,7 +1069,7 @@ class TimetableCreatorMenu(Menu):
         if key == 27:
             self.input_buffer = []
 
-            for i in range(self.num_periods):
+            for _ in range(self.num_periods):
                 self.input_buffer.append("")
                 self.input_buffer.append("")
 
@@ -1264,7 +1264,7 @@ class TimetableCreatorMenu(Menu):
             elif self.state == 3:
                 self.display_editing_subject()
 
-            self.title = f"Creating Timetable: {self.states.get(self.state)}"
+            self.title = f"{self.states.get(self.state)} | Creating Timetable"
 
             self.window.addstr(0, 2, self.title)
             self.window.addstr(self.height - 1, 2, self.shortcut_info)
