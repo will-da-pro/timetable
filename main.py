@@ -11,6 +11,8 @@ import glob
 from dataclasses import dataclass
 from random import randint
 import argparse
+from pathlib import Path
+from typing import Callable
 
 
 # Exception Handling
@@ -377,6 +379,8 @@ class Menu(ABC):
         self.window.bkgd(' ', curses.color_pair(1))
 
         self.selected_list_item: int = 0
+        self.top_list_item: int = 0
+        self.max_list_items: int = self.height - 8
 
         self.list_items: list[tuple] = []
 
@@ -389,12 +393,20 @@ class Menu(ABC):
         else:
             self.editing = False
 
-        for index, item in enumerate(self.list_items):
-            if index == self.selected_list_item:
-                self.window.addstr(index + 2, 1, item[0], curses.A_REVERSE)
+        display_list: list[tuple] = self.list_items[self.top_list_item:self.top_list_item + self.max_list_items]
+
+        for index, item in enumerate(display_list):
+            if index + self.top_list_item == self.selected_list_item:
+                self.window.addstr(index + 2, 1, f"› {item[0]} ", curses.A_REVERSE)
 
             else:
                 self.window.addstr(index + 2, 1, item[0])
+
+        if self.top_list_item > 0:
+            self.window.addstr(1, 1, " More ", curses.A_REVERSE)
+
+        if len(self.list_items) - self.top_list_item > self.max_list_items:
+            self.window.addstr(self.max_list_items + 2, 1, " More ", curses.A_REVERSE)
 
     def navigate_list(self, change: int) -> None:
         self.selected_list_item += change
@@ -404,6 +416,14 @@ class Menu(ABC):
 
         elif self.selected_list_item >= len(self.list_items):
             self.selected_list_item = len(self.list_items) - 1
+
+        relative_pos: int = self.selected_list_item - self.top_list_item
+
+        if relative_pos >= self.max_list_items:
+            self.top_list_item = self.selected_list_item - self.max_list_items + 1
+
+        elif relative_pos < 0:
+            self.top_list_item = self.selected_list_item
 
     def exit(self) -> None:
         """
@@ -426,7 +446,7 @@ class Menu(ABC):
         pass
 
 
-class ListMenu(Menu):
+class QuickListMenu(Menu):
     def __init__(self, title: str, items, stdscreen):
         super().__init__(title, stdscreen)
 
@@ -434,42 +454,10 @@ class ListMenu(Menu):
         self.panel.hide()
         panel.update_panels()
 
-        self.position = 0
-        self.items = items
-
-        self.items.append(("Exit", "Exit"))
+        self.list_items = items
+        self.list_items.append(("Exit", "Exit"))
 
         self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [return] Select"
-
-    def navigate(self, position_change) -> None:
-        self.position += position_change
-
-        if self.position < 0:
-            self.position = 0
-
-        elif self.position >= len(self.items):
-            self.position = len(self.items) - 1
-
-    def exit(self):
-        self.window.clear()
-        self.panel.hide()
-        panel.update_panels()
-        curses.doupdate()
-
-    def display_items(self) -> None:
-        self.window.clear()
-        self.window.addstr(0, 2, self.title)
-        self.window.refresh()
-        curses.doupdate()
-
-        for index, item in enumerate(self.items):
-            if index == self.position:
-                mode = curses.A_REVERSE
-            else:
-                mode = curses.A_NORMAL
-
-            msg: str = item[0]
-            self.window.addstr(2 + index, 1, msg, mode)
 
     def display(self) -> None:
         self.panel.top()
@@ -477,24 +465,24 @@ class ListMenu(Menu):
         self.window.clear()
 
         while True:
-            self.display_items()
+            self.window.erase()
+            self.display_list()
             self.window.addstr(self.height - 1, 2, self.shortcut_info)
             self.window.refresh()
 
             key = self.window.getch()
 
             if key in [curses.KEY_ENTER, ord("\n")]:
-                if self.position == len(self.items) - 1:
+                if self.list_items[self.selected_list_item][1] == "Exit":
                     self.exit()
                     return
 
-                else:
-                    if len(self.items[self.position]) <= 2:
-                        self.items[self.position][1]()
+                elif isinstance(self.list_items[self.selected_list_item][1], Callable):
+                    if len(self.list_items[self.selected_list_item]) <= 2:
+                        self.list_items[self.selected_list_item][1]()
 
                     else:
-                        self.panel.hide()
-                        self.items[self.position][1](*self.items[self.position][2:])
+                        self.list_items[self.selected_list_item][1](*self.list_items[self.selected_list_item][2:])
 
             elif key == ord("q"):
                 raise ExitCurses("Exiting")
@@ -504,10 +492,10 @@ class ListMenu(Menu):
                 return
 
             elif key == curses.KEY_UP:
-                self.navigate(-1)
+                self.navigate_list(-1)
 
             elif key == curses.KEY_DOWN:
-                self.navigate(1)
+                self.navigate_list(1)
 
 
 class TimetableMenu(Menu):
@@ -576,7 +564,7 @@ class TimetableMenu(Menu):
 
                 self.period_windows.append(period_window)
 
-    def create_side_info_windows(self) -> None:
+    def create_period_time_windows(self) -> None:
         for index, period_data in enumerate(self.timetable.period_times.values()):
             window_x = self.x_pos + self.margin
             window_y = self.y_pos + self.margin + index * self.period_height
@@ -820,7 +808,7 @@ class TimetableMenu(Menu):
 
         if self.state == 0 or self.state == 1:
             self.create_period_windows()
-            self.create_side_info_windows()
+            self.create_period_time_windows()
 
         while True:
             self.window.clear()
@@ -933,7 +921,7 @@ class TimetableCreatorMenu(Menu):
 
                     self.input_buffer = []
 
-                    for i in range(self.num_periods):
+                    for _ in range(self.num_periods):
                         self.input_buffer.append("")
                         self.input_buffer.append("")
 
@@ -1023,7 +1011,7 @@ class TimetableCreatorMenu(Menu):
             if self.list_items[self.selected_list_item][1] == "Back":
                 self.input_buffer = []
 
-                for i in range(self.num_periods):
+                for _ in range(self.num_periods):
                     self.input_buffer.append("")
                     self.input_buffer.append("")
 
@@ -1057,7 +1045,7 @@ class TimetableCreatorMenu(Menu):
                     timetable_view_menu.display()
 
             else:
-                self.subject_editing_id: str = list(self.subjects.keys())[self.selected_list_item]
+                self.subject_editing_id = list(self.subjects.keys())[self.selected_list_item]
 
                 self.input_buffer = [
                     self.subjects[self.subject_editing_id].name,
@@ -1085,7 +1073,7 @@ class TimetableCreatorMenu(Menu):
 
     def process_input_editing_subject(self, key: int) -> None:
         if key in [curses.KEY_ENTER, ord("\n")]:
-            if self.list_items[self.selected_list_item][1] == "Delete":
+            if self.list_items[self.selected_list_item][1] == "Delete" and self.subject_editing_id is not None:
                 if self.subjects.get(self.subject_editing_id) is not None:
                     del self.subjects[self.subject_editing_id]
 
@@ -1093,7 +1081,7 @@ class TimetableCreatorMenu(Menu):
                 self.selected_list_item = 0
                 self.state = 2
 
-            elif self.list_items[self.selected_list_item][1] == "Save":
+            elif self.list_items[self.selected_list_item][1] == "Save" and self.subject_editing_id is not None:
                 if self.input_buffer[0] == "":
                     popup_window = TempPopupWindow("Please enter a name for the period.", self.stdscreen)
                     popup_window.display()
@@ -1322,7 +1310,8 @@ class App:
         files = glob.glob("data/*.json")
         file_items = []
         for file in files:
-            file_items.append((file, self.open_file, file))
+            file_name: str = Path(file).stem
+            file_items.append((file_name, self.open_file, file))
 
         # No .json files found
         if len(file_items) == 0:
@@ -1330,7 +1319,7 @@ class App:
                 ("No files found! Are you sure they are in the correct directory? (data/[name].json)", curses.beep))
 
         # Instance of ListMenu for selecting a file to open
-        files_menu = ListMenu("Select a file to open", file_items, self.screen)
+        files_menu = QuickListMenu("Select a file to open", file_items, self.screen)
 
         main_menu_items = [
             ("Open Existing", files_menu.display),
@@ -1338,7 +1327,7 @@ class App:
         ]
 
         # ListMenu instance for selecting whether to view or edit a timetable
-        main_menu = ListMenu("Open an existing timetable or create a new one", main_menu_items, self.screen)
+        main_menu = QuickListMenu("Open an existing timetable or create a new one", main_menu_items, self.screen)
         main_menu.display()
 
     @staticmethod
@@ -1391,7 +1380,12 @@ class App:
         for i, day in enumerate(timetable_raw):
             periods[i] = {}
             for period_id, val in day.items():
-                subject: Subject | None = subjects.get(val.get("subject"))
+                subject_id: str | None = val.get("subject")
+
+                if subject_id is None:
+                    raise InvalidDataException("No subject ID found")
+
+                subject: Subject | None = subjects.get(subject_id)
                 room: str | None = val.get("room")
 
                 if subject is None or room is None:
@@ -1449,4 +1443,4 @@ if __name__ == "__main__":
         parser.error(str(e))
 
     except curses.error:
-        print("Terminal to small! Make sure you are running it in full screen!")
+        print("Terminal may be too small! Make sure you are running it in full screen!")
