@@ -1,9 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2025 William D'Olier
 
 import json
 import curses
+from collections.abc import Callable
 from curses import panel
 import os
 from abc import ABC, abstractmethod
@@ -12,7 +13,6 @@ from dataclasses import dataclass
 from random import randint
 import argparse
 from pathlib import Path
-from typing import Callable
 
 
 # Exception Handling
@@ -122,6 +122,7 @@ class Timetable:
         self.periods: dict[int, dict[str, Period]] = periods
         self.subjects: dict[str, Subject] = subjects
         self.period_times: dict[str, PeriodTimeStruct] = period_times
+
         self.name: str = name
         self.filename: str = filename
 
@@ -214,6 +215,7 @@ class ContentWindow(ABC):
         self.border_window.border(0)
         self.border_window.refresh()
 
+        # Main window for all content
         self.window = parent.subwin(height - 2, width - 2, self.y_pos + 1, self.x_pos + 1)
         self.window.bkgd(' ', curses.color_pair(1))
 
@@ -246,7 +248,7 @@ class PeriodWindow(ContentWindow):
         :param height: The height of the window.
         :param x_pos: The x position of the window, relative to the entire screen.
         :param y_pos: The y position of the window, relative to the entire screen.
-        :param x_index: The day of the period.
+        :param x_index: The day index of the period.
         :param y_index: The index of the period during the day.
         :param parent: The parent window object.
         """
@@ -261,6 +263,7 @@ class PeriodWindow(ContentWindow):
     def display(self, selected: bool = False) -> None:
         self.window.erase()
 
+        # Checks if the window is being selected by the user
         if selected:
             self.window.bkgd(' ', curses.color_pair(3))
             self.border_window.bkgd(' ', curses.color_pair(3))
@@ -269,11 +272,13 @@ class PeriodWindow(ContentWindow):
             self.window.bkgd(' ', curses.color_pair(1))
             self.border_window.bkgd(' ', curses.color_pair(1))
 
+        # Adds all info
         self.window.addstr(0, 1, self.period.subject.name)
         self.window.addstr(1, 1, self.period.subject.teacher)
         self.window.addstr(2, 1, self.period.room)
         self.window.refresh()
 
+        # Refreshes the border window for colors to change
         self.border_window.border(0)
         self.border_window.refresh()
 
@@ -294,6 +299,7 @@ class PeriodTimeWindow(ContentWindow):
     def display(self) -> None:
         self.window.erase()
 
+        # Displays all info
         self.window.addstr(0, 1, self.period_times.name)
         self.window.addstr(1, 1, self.period_times.start_time)
         self.window.addstr(2, 1, self.period_times.end_time)
@@ -330,6 +336,7 @@ class TempPopupWindow(ContentWindow):
     def display(self) -> None:
         self.window.erase()
 
+        # Display info
         self.window.addstr(0, 1, self.message)
         self.window.addstr(1, 1, self.secondary_message)
 
@@ -347,6 +354,7 @@ class Menu(ABC):
 
     Creates a border window, shadow window and main window for rendering content.
     """
+
     def __init__(self, title: str, stdscreen: curses.window,
                  width: int = 150, height: int = 40,
                  header: str = "TIMETABLE APP") -> None:
@@ -387,23 +395,33 @@ class Menu(ABC):
         self.window.keypad(True)
         self.window.bkgd(' ', curses.color_pair(1))
 
+        # Attributes used for displaying a navigable list on screen
         self.selected_list_item: int = 0
         self.top_list_item: int = 0
         self.max_list_items: int = self.height - 8
 
         self.list_items: list[tuple] = []
 
+        # Used to disable shortcuts when the user is editing text
         self.editing: bool = False
 
     def display_list(self) -> None:
+        """
+        Displays a navigable list of items on screen.
+
+        :return:
+        """
+
         if self.list_items[self.selected_list_item][1] == "editor":
             self.editing = True
 
         else:
             self.editing = False
 
+        # Shorten the list to only display less than the maximum number of items, starting at the top item
         display_list: list[tuple] = self.list_items[self.top_list_item:self.top_list_item + self.max_list_items]
 
+        # Displays the list on screen
         for index, item in enumerate(display_list):
             if index + self.top_list_item == self.selected_list_item:
                 self.window.addstr(index + 2, 1, f"› {item[0]} ", curses.A_REVERSE)
@@ -411,6 +429,7 @@ class Menu(ABC):
             else:
                 self.window.addstr(index + 2, 1, item[0])
 
+        # Check if there are additional list items that have been cut off
         if self.top_list_item > 0:
             self.window.addstr(1, 1, " More ", curses.A_REVERSE)
 
@@ -418,6 +437,13 @@ class Menu(ABC):
             self.window.addstr(self.max_list_items + 2, 1, " More ", curses.A_REVERSE)
 
     def navigate_list(self, change: int) -> None:
+        """
+        Used to change the user's position in the navigation list.
+
+        :param change: The amount to change by.
+        :return:
+        """
+
         self.selected_list_item += change
 
         if self.selected_list_item < 0:
@@ -426,6 +452,7 @@ class Menu(ABC):
         elif self.selected_list_item >= len(self.list_items):
             self.selected_list_item = len(self.list_items) - 1
 
+        # Get the position relative to the top displayed element, and adjust if necessary
         relative_pos: int = self.selected_list_item - self.top_list_item
 
         if relative_pos >= self.max_list_items:
@@ -456,6 +483,10 @@ class Menu(ABC):
 
 
 class QuickListMenu(Menu):
+    """
+    Allows for the quick creation of a simple list menu.
+    """
+
     def __init__(self, title: str, items, stdscreen):
         super().__init__(title, stdscreen)
 
@@ -482,6 +513,7 @@ class QuickListMenu(Menu):
 
             key = self.window.getch()
 
+            # Check if the user has pressed enter to select an item
             if key in [curses.KEY_ENTER, ord("\n")]:
                 if self.list_items[self.selected_list_item][1] == "Exit":
                     self.exit()
@@ -495,6 +527,7 @@ class QuickListMenu(Menu):
                     else:
                         self.list_items[self.selected_list_item][1](*self.list_items[self.selected_list_item][2:])
 
+            # Exit the program
             elif key == ord("q"):
                 raise ExitCurses("Exiting")
 
@@ -503,6 +536,7 @@ class QuickListMenu(Menu):
                 self.exit()
                 return
 
+            # Navigate the list
             elif key == curses.KEY_UP:
                 self.navigate_list(-1)
 
@@ -511,6 +545,19 @@ class QuickListMenu(Menu):
 
 
 class TimetableMenu(Menu):
+    """
+    Main class for viewing and editing timetable objects.
+
+    Has 4 different states:
+
+    - Viewing
+    - Editing
+    - Editing Period
+    - Selecting Subject
+
+    Each state has its own sub-menu, and input handling.
+    """
+
     def __init__(self, timetable: Timetable, stdscreen: curses.window) -> None:
         """
         Creates a menu for rendering a timetable, with an editor.
@@ -792,7 +839,7 @@ class TimetableMenu(Menu):
         self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [s] Save Timetable, [return] Select"
 
         self.list_items = [
-            (f"Subject: {self.selected_subject if self.selected_subject is not None else 'None'}", "subject"),
+            (f"Subject: {self.selected_subject}", "subject"),
             (f"Room: {self.input_buffer}", "editor"),
             ("Delete", "delete"),
             ("Save and Exit", "save_exit"),
@@ -952,8 +999,8 @@ class TimetableCreatorMenu(Menu):
 
         elif self.list_items[self.selected_list_item][1] == "editor":
             if self.list_items[self.selected_list_item][2] == "name":
-                if ((ord('!') <= key <= ord('~') or key == ord(' ')) and # See an ascii chart
-                        key != ord('/') and # Illegal character in unix filenames so cannot be used
+                if ((ord('!') <= key <= ord('~') or key == ord(' ')) and  # See an ascii chart for context
+                        key != ord('/') and  # Illegal character in unix filenames so must be filtered out
                         len(self.input_buffer[0]) < self.max_input_size):
                     self.input_buffer[0] += chr(key)
 
