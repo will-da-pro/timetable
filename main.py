@@ -952,7 +952,8 @@ class TimetableCreatorMenu(Menu):
 
         elif self.list_items[self.selected_list_item][1] == "editor":
             if self.list_items[self.selected_list_item][2] == "name":
-                if ((ord('!') <= key <= ord('~') or key == ord(' ')) and
+                if ((ord('!') <= key <= ord('~') or key == ord(' ')) and # See an ascii chart
+                        key != ord('/') and # Illegal character in unix filenames so cannot be used
                         len(self.input_buffer[0]) < self.max_input_size):
                     self.input_buffer[0] += chr(key)
 
