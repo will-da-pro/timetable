@@ -568,6 +568,7 @@ class TimetableMenu(Menu):
 
         super().__init__(timetable.name, stdscreen)
 
+        # Attributes for states
         self.states: dict[int, str] = {
             -1: "Exiting",
             0: "Viewing",
@@ -583,17 +584,21 @@ class TimetableMenu(Menu):
         panel.update_panels()
 
         self.timetable = timetable
-        self.days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [s] Save Timetable, [return] Select"
 
+        # Will be rendered onscreen
+        self.days: list[str] = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+        self.shortcut_info: str = "Shortcuts: [esc] Back, [q] Quit, [s] Save Timetable, [return] Select"
+
+        # Windows for periods and period times
         self.period_windows: list[PeriodWindow] = []
-        self.side_info_windows: list[PeriodTimeWindow] = []
+        self.period_time_windows: list[PeriodTimeWindow] = []
 
+        # More info for displaying windows
         self.margin: int = 5
-        self.side_info_width: int = self.margin * 3
+        self.period_times_window_width: int = self.margin * 3
 
         self.period_height: int = 5
-        self.period_width: int = (self.width - self.side_info_width - 2 * self.margin) // 5
+        self.period_width: int = (self.width - self.period_times_window_width - 2 * self.margin) // 5
 
         self.cell_x_count: int = 5
         self.cell_y_count: int = len(self.timetable.period_times)
@@ -608,13 +613,19 @@ class TimetableMenu(Menu):
         self.max_input_size: int = 20
 
     def create_period_windows(self) -> None:
+        """
+        Creates the windows used to display the periods.
+
+        :return:
+        """
+
         self.period_windows = []
 
         for day_num, day in self.timetable.periods.items():
             for period_id, period in day.items():
                 day_index = list(self.timetable.period_times.keys()).index(period_id)
 
-                window_x = self.x_pos + self.margin + day_num * self.period_width + self.side_info_width
+                window_x = self.x_pos + self.margin + day_num * self.period_width + self.period_times_window_width
                 window_y = self.y_pos + self.margin + day_index * self.period_height
 
                 period_window: PeriodWindow = PeriodWindow(period, self.period_width, self.period_height,
@@ -624,21 +635,35 @@ class TimetableMenu(Menu):
                 self.period_windows.append(period_window)
 
     def create_period_time_windows(self) -> None:
-        for index, period_data in enumerate(self.timetable.period_times.values()):
-            window_x = self.x_pos + self.margin
-            window_y = self.y_pos + self.margin + index * self.period_height
+        """
+        Creates the windows used to display the period times.
 
-            period_time_window: PeriodTimeWindow = PeriodTimeWindow(period_data, self.side_info_width,
+        :return:
+        """
+
+        for index, period_data in enumerate(self.timetable.period_times.values()):
+            window_x: int = self.x_pos + self.margin
+            window_y: int = self.y_pos + self.margin + index * self.period_height
+
+            period_time_window: PeriodTimeWindow = PeriodTimeWindow(period_data, self.period_times_window_width,
                                                                     self.period_height,
                                                                     window_x, window_y,
                                                                     self.window)
 
-            self.side_info_windows.append(period_time_window)
+            self.period_time_windows.append(period_time_window)
 
     def render_timetable(self, **kwargs) -> None:
+        """
+        Renders the timetable on the screen.
+
+        :param kwargs:
+        :return:
+        """
+
         highlighted: tuple[int, int] | None = kwargs.get("highlighted")
         selection_found: bool = False
 
+        # Render each period window
         for period_window in self.period_windows:
             if (highlighted is not None
                     and highlighted[0] == period_window.x_index
@@ -650,24 +675,26 @@ class TimetableMenu(Menu):
             else:
                 period_window.display()
 
+        # If the highlighted window does not exist, allow the user to create a new one
         if highlighted is not None and not selection_found:
-            window_x = self.margin + highlighted[0] * self.period_width + self.side_info_width + 1
+            window_x = self.margin + highlighted[0] * self.period_width + self.period_times_window_width + 1
             window_y = self.margin + highlighted[1] * self.period_height + 1
 
             self.window.addstr(window_y, window_x, "<Add New>", curses.color_pair(3))
 
-        for period_time_window in self.side_info_windows:
+        for period_time_window in self.period_time_windows:
             period_time_window.display()
 
         for i, day in enumerate(self.days):
-            self.window.addstr(self.margin - 2, self.margin + i * self.period_width + self.side_info_width + 2,
-                               day,
+            self.window.addstr(self.margin - 2, self.margin + i * self.period_width +
+                               self.period_times_window_width + 2, day,
                                curses.color_pair(4))
 
     def navigate_timetable(self, x_change: int, y_change: int) -> None:
         self.selected_period_x += x_change
         self.selected_period_y += y_change
 
+        # Ensure the selected period is within the boundaries of the timetable
         if self.selected_period_x < 0:
             self.selected_period_x = 0
 
@@ -872,6 +899,8 @@ class TimetableMenu(Menu):
         while True:
             self.window.clear()
 
+            # Display State
+
             if self.state == -1:
                 self.exit()
                 return
@@ -891,6 +920,10 @@ class TimetableMenu(Menu):
             self.title = f"{self.states.get(self.state)} | {self.timetable.name}"
 
             self.window.addstr(0, 2, self.title)
+
+            if self.editing:
+                self.shortcut_info = "(Editing)"
+
             self.window.addstr(self.height - 1, 2, self.shortcut_info)
             self.window.refresh()
             curses.doupdate()
@@ -901,12 +934,25 @@ class TimetableMenu(Menu):
 
 
 class TimetableCreatorMenu(Menu):
+    """
+    Main menu used for creating timetables.
+
+    Has 4 different states:
+
+    - Editing Basic Info
+    - Creating Period Times
+    - Viewing Subjects
+    - Editing Subject
+
+    Each state has its own sub-menu, and input handling.
+    """
+
     def __init__(self, stdscreen: curses.window) -> None:
         super().__init__("Creating New Timetable", stdscreen)
 
         self.states: dict[int, str] = {
             -1: "Exiting",
-            0: "Basic Info",
+            0: "Editing Basic Info",
             1: "Creating Period Times",
             2: "Viewing Subjects",
             3: "Editing Subject"
@@ -1097,6 +1143,12 @@ class TimetableCreatorMenu(Menu):
                 self.state = 3
 
             elif self.list_items[self.selected_list_item][1] == "Create":
+                if len(self.subjects) == 0:
+                    popup_window = TempPopupWindow("Create at least one subject to proceed.", self.stdscreen)
+                    popup_window.display()
+
+                    return
+
                 self.create_timetable()
 
                 if self.timetable is not None:
@@ -1221,11 +1273,7 @@ class TimetableCreatorMenu(Menu):
 
         self.display_list()
 
-        if self.editing:
-            self.shortcut_info = "(Editing)"
-
-        else:
-            self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [return] Select"
+        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [return] Select"
 
     def display_creating_period_times(self) -> None:
         self.list_items = []
@@ -1242,11 +1290,7 @@ class TimetableCreatorMenu(Menu):
 
         self.display_list()
 
-        if self.editing:
-            self.shortcut_info = "(Editing)"
-
-        else:
-            self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [return] Select"
+        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [return] Select"
 
     def display_viewing_subjects(self) -> None:
         self.list_items = []
@@ -1260,10 +1304,7 @@ class TimetableCreatorMenu(Menu):
 
         self.display_list()
 
-        if self.editing:
-            self.shortcut_info = "(Editing)"
-
-        elif isinstance(self.list_items[self.selected_list_item][1], Subject):
+        if isinstance(self.list_items[self.selected_list_item][1], Subject):
             self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [return] Edit Subject"
 
         else:
@@ -1282,11 +1323,7 @@ class TimetableCreatorMenu(Menu):
 
         self.display_list()
 
-        if self.editing:
-            self.shortcut_info = "(Editing)"
-
-        else:
-            self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [return] Select"
+        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [return] Select"
 
     def display(self) -> None:
         self.panel.top()
@@ -1313,6 +1350,9 @@ class TimetableCreatorMenu(Menu):
                 self.display_editing_subject()
 
             self.title = f"{self.states.get(self.state)} | Creating Timetable"
+
+            if self.editing:
+                self.shortcut_info = "(Editing)"
 
             self.window.addstr(0, 2, self.title)
             self.window.addstr(self.height - 1, 2, self.shortcut_info)
@@ -1409,6 +1449,7 @@ class App:
         :return:
         """
 
+        # Uses the JSON module to load data into python objects
         with open(filename) as f:
             try:
                 json_data: dict | None = json.load(f)
@@ -1418,6 +1459,7 @@ class App:
         if json_data is None:
             raise InvalidDataException("No data found!")
 
+        # Tries to extract timetable data from the json data
         try:
             timetable_name: str = json_data["name"]
             timetable_raw: list[dict[str, dict[str, str]]] = json_data["timetable"]
@@ -1426,6 +1468,7 @@ class App:
         except KeyError:
             raise InvalidDataException("Invalid configuration (Missing Data)")
 
+        # Creating subject objects
         subjects: dict[str, Subject] = {}
         for subject_id, subject_raw in subjects_raw.items():
             name: str | None = subject_raw.get("name")
@@ -1436,6 +1479,7 @@ class App:
 
             subjects[subject_id] = Subject(subject_id, name, teacher)
 
+        # Creating timetable of periods
         periods: dict[int, dict[str, Period]] = {}
         for i, day in enumerate(timetable_raw):
             periods[i] = {}
@@ -1455,6 +1499,7 @@ class App:
 
                 periods[i][period_id] = period
 
+        # Creating period time objects
         period_times: dict[str, PeriodTimeStruct] = {}
         for period_num, period_time_data in period_times_raw.items():
             name: str | None = period_time_data.get("name")
@@ -1467,20 +1512,37 @@ class App:
             period_time_struct = PeriodTimeStruct(name, start_time, end_time)
             period_times[period_num] = period_time_struct
 
+        # Creates Timetable
         self.current_timetable = Timetable(periods, subjects, period_times, timetable_name, filename)
 
     def open_file(self, filename: str) -> None:
+        """
+        Loads and runs the given file.
+
+        :param filename: The path to the JSON file to load.
+        :return:
+        """
+
         self.load_file(filename)
+
         if self.current_timetable is not None:
             timetable_menu = TimetableMenu(self.current_timetable, self.screen)
             timetable_menu.display()
 
     def create_new_timetable(self) -> None:
+        """
+        Opens the menu to create a new timetable.
+
+        :return:
+        """
+
         timetable_creator_menu = TimetableCreatorMenu(self.screen)
         timetable_creator_menu.display()
 
 
+# Ensures the script doesn't run if it is being imported as a library
 if __name__ == "__main__":
+    # Argument Handling, allows for the user to open straight into a timetable to view
     parser = argparse.ArgumentParser(description='Simple timetable creator and viewer written in Python')
     parser.add_argument('opt_file', type=str, nargs='?',
                         help='Timetable file path to view')
@@ -1492,6 +1554,7 @@ if __name__ == "__main__":
         # If this is omitted, crashing will result in the curses content remaining on the screen which is not wanted
         curses.wrapper(App)
 
+    # Various exceptions that may be called by the program
     except ExitCurses as e:
         print(e)
 
