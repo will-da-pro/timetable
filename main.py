@@ -606,9 +606,11 @@ class TimetableMenu(Menu):
         self.selected_period_x: int = 0
         self.selected_period_y: int = 0
 
+        # Used to edit the selected period or subject
         self.selected_period: Period | None = None
         self.selected_subject: Subject | None = None
 
+        # Input handling
         self.input_buffer: str = ""
         self.max_input_size: int = 20
 
@@ -625,6 +627,7 @@ class TimetableMenu(Menu):
             for period_id, period in day.items():
                 day_index = list(self.timetable.period_times.keys()).index(period_id)
 
+                # Position of the new window
                 window_x = self.x_pos + self.margin + day_num * self.period_width + self.period_times_window_width
                 window_y = self.y_pos + self.margin + day_index * self.period_height
 
@@ -642,6 +645,7 @@ class TimetableMenu(Menu):
         """
 
         for index, period_data in enumerate(self.timetable.period_times.values()):
+            # Position of the new window
             window_x: int = self.x_pos + self.margin
             window_y: int = self.y_pos + self.margin + index * self.period_height
 
@@ -675,13 +679,14 @@ class TimetableMenu(Menu):
             else:
                 period_window.display()
 
-        # If the highlighted window does not exist, allow the user to create a new one
+        # If the highlighted window does not exist, display the option to create a new one at the selected position
         if highlighted is not None and not selection_found:
             window_x = self.margin + highlighted[0] * self.period_width + self.period_times_window_width + 1
             window_y = self.margin + highlighted[1] * self.period_height + 1
 
             self.window.addstr(window_y, window_x, "<Add New>", curses.color_pair(3))
 
+        # Display period time windows
         for period_time_window in self.period_time_windows:
             period_time_window.display()
 
@@ -722,6 +727,7 @@ class TimetableMenu(Menu):
             selected_period_id: str = list(self.timetable.period_times.keys())[self.selected_period_y]
             self.selected_period = self.timetable.periods[self.selected_period_x].get(selected_period_id)
 
+            # Load the subject of the selected period
             if self.selected_period is not None:
                 self.selected_subject = self.selected_period.subject
                 self.input_buffer = self.selected_period.room
@@ -751,11 +757,13 @@ class TimetableMenu(Menu):
 
     def process_input_editing_period(self, key: int) -> None:
         if key in [curses.KEY_ENTER, ord("\n")]:
+            # Select a subject
             if self.list_items[self.selected_list_item][1] == "subject":
                 self.selected_list_item = 0
 
                 self.state = 3
 
+            # Delete the period
             elif self.list_items[self.selected_list_item][1] == "delete":
                 period_id: str = list(self.timetable.period_times.keys())[self.selected_period_y]
 
@@ -766,6 +774,7 @@ class TimetableMenu(Menu):
 
                 self.state = 1
 
+            # Save the period ad exit
             elif self.list_items[self.selected_list_item][1] == "save_exit":
                 if self.selected_subject is not None:
                     period_id: str = list(self.timetable.period_times.keys())[self.selected_period_y]
@@ -781,6 +790,7 @@ class TimetableMenu(Menu):
                     popup_window = TempPopupWindow("Please select a subject.", self.stdscreen)
                     popup_window.display()
 
+            # Exit without saving
             elif self.list_items[self.selected_list_item][1] == "back":
                 self.state = 1
 
@@ -835,6 +845,7 @@ class TimetableMenu(Menu):
             saved_popup.display()
 
         else:
+            # Process input based on state
             if self.state == 0:
                 self.process_input_viewing(key)
 
@@ -858,7 +869,7 @@ class TimetableMenu(Menu):
         self.render_timetable()
 
     def display_editing(self) -> None:
-        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [s] Save Timetable, [return] Select"
+        self.shortcut_info = "Shortcuts: [esc] Back, [q] Quit, [s] Save Timetable, [return] Edit Period"
 
         self.render_timetable(highlighted=(self.selected_period_x, self.selected_period_y))
 
@@ -1005,6 +1016,8 @@ class TimetableCreatorMenu(Menu):
             self.period_times[str(index)] = PeriodTimeStruct(f"Period {index + start_index}",
                                                              self.input_buffer[index * 2],
                                                              self.input_buffer[index * 2 + 1])
+
+    # Input Processing
 
     def process_input_basic_info(self, key: int) -> None:
         if key in [curses.KEY_ENTER, ord("\n")]:
@@ -1261,6 +1274,8 @@ class TimetableCreatorMenu(Menu):
 
             else:
                 raise ExitCurses("Invalid state")
+
+    # Displaying Windows
 
     def display_basic_info(self) -> None:
         self.list_items = [
