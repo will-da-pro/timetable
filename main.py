@@ -1259,21 +1259,20 @@ class TimetableCreatorMenu(Menu):
         if key in [ord('q'), ord('Q')] and self.editing is False:
             raise ExitCurses("Exiting")
 
+        if self.state == 0:
+            self.process_input_basic_info(key)
+
+        elif self.state == 1:
+            self.process_input_creating_period_times(key)
+
+        elif self.state == 2:
+            self.process_input_viewing_subjects(key)
+
+        elif self.state == 3:
+            self.process_input_editing_subject(key)
+
         else:
-            if self.state == 0:
-                self.process_input_basic_info(key)
-
-            elif self.state == 1:
-                self.process_input_creating_period_times(key)
-
-            elif self.state == 2:
-                self.process_input_viewing_subjects(key)
-
-            elif self.state == 3:
-                self.process_input_editing_subject(key)
-
-            else:
-                raise ExitCurses("Invalid state")
+            raise ExitCurses("Invalid state")
 
     # Displaying Windows
 
@@ -1332,8 +1331,8 @@ class TimetableCreatorMenu(Menu):
             (f"Name: {self.input_buffer[0]}", "editor", "name"),
             (f"Teacher: {self.input_buffer[1]}", "editor", "teacher"),
             ("Delete", "Delete"),
-            (f"Save and Exit", "Save"),
-            (f"Back", "Back"),
+            ("Save and Exit", "Save"),
+            ("Back", "Back"),
         ]
 
         self.display_list()
@@ -1480,8 +1479,10 @@ class App:
             timetable_raw: list[dict[str, dict[str, str]]] = json_data["timetable"]
             subjects_raw: dict[str, dict[str, str]] = json_data["subjects"]
             period_times_raw: dict[str, dict[str, str]] = json_data["period_times"]
-        except KeyError:
-            raise InvalidDataException("Invalid configuration (Missing Data)")
+
+        # Occurs if there is a missing field in the JSON data
+        except KeyError as exception:
+            raise InvalidDataException("Invalid configuration (Missing Data)") from exception
 
         # Creating subject objects
         subjects: dict[str, Subject] = {}
@@ -1573,9 +1574,9 @@ if __name__ == "__main__":
     except ExitCurses as e:
         print(e)
 
-    except InvalidDataException as e:
+    except InvalidDataException as exc:
         print("Error: Invalid JSON Data!")
-        print(e)
+        raise exc
 
     except InvalidFileException as e:
         parser.error(str(e))
