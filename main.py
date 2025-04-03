@@ -46,6 +46,7 @@ class InvalidFileException(Exception):
 
 
 # Data Structures
+# Allows for much clearer type hints, and easier to work with than dictionaries.
 
 
 @dataclass
@@ -76,7 +77,7 @@ class Period:
     room: str
 
     def __str__(self) -> str:
-        return f"{self.subject}; Period - room: {self.room}"
+        return f"Subject: {self.subject}, Room: {self.room}"
 
 
 @dataclass
@@ -1000,7 +1001,7 @@ class TimetableCreatorMenu(Menu):
         for i in range(6):
             periods[i] = {}
 
-        filename: str = f"{script_dir}/data/{self.timetable_name.lower().replace(' ', '_')}.json"
+        filename: str = f"{data_dir}/{self.timetable_name.lower().replace(' ', '_')}.json"
 
         self.timetable = Timetable(periods, self.subjects, self.period_times, self.timetable_name, filename)
 
@@ -1421,7 +1422,7 @@ class App:
             self.open_file(file)
 
         # Search the data/ directory for .json files
-        files = glob.glob(f"{script_dir}/data/*.json")
+        files = glob.glob(f"{data_dir}/*.json")
         file_items = []
         for file in files:
             file_name: str = Path(file).stem
@@ -1452,8 +1453,8 @@ class App:
         :return:
         """
 
-        if not os.path.exists(f"{script_dir}/data"):
-            os.makedirs(f"{script_dir}/data")
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
 
     def load_file(self, filename: str) -> None:
         """
@@ -1560,7 +1561,7 @@ class App:
 if __name__ == "__main__":
     # Get the directory of the script
     # Allows for the script to be run from /usr/local/bin via a symlink
-    script_dir: str = os.path.dirname(os.path.realpath(os.path.abspath(__file__)))
+    data_dir: str = f"{os.path.dirname(os.path.realpath(os.path.abspath(__file__)))}/data"
 
     # Argument Handling, allows for the user to open straight into a timetable to view
     parser = argparse.ArgumentParser(description='Simple timetable creator and viewer written in Python')
