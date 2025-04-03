@@ -1000,7 +1000,7 @@ class TimetableCreatorMenu(Menu):
         for i in range(6):
             periods[i] = {}
 
-        filename: str = f"data/{self.timetable_name.lower().replace(' ', '_')}.json"
+        filename: str = f"{script_dir}/data/{self.timetable_name.lower().replace(' ', '_')}.json"
 
         self.timetable = Timetable(periods, self.subjects, self.period_times, self.timetable_name, filename)
 
@@ -1421,7 +1421,7 @@ class App:
             self.open_file(file)
 
         # Search the data/ directory for .json files
-        files = glob.glob("data/*.json")
+        files = glob.glob(f"{script_dir}/data/*.json")
         file_items = []
         for file in files:
             file_name: str = Path(file).stem
@@ -1452,8 +1452,8 @@ class App:
         :return:
         """
 
-        if not os.path.exists("data"):
-            os.makedirs("data")
+        if not os.path.exists(f"{script_dir}/data"):
+            os.makedirs(f"{script_dir}/data")
 
     def load_file(self, filename: str) -> None:
         """
@@ -1467,8 +1467,8 @@ class App:
         with open(filename) as f:
             try:
                 json_data: dict | None = json.load(f)
-            except json.decoder.JSONDecodeError:
-                raise InvalidDataException("Invalid JSON")
+            except json.decoder.JSONDecodeError as exception:
+                raise InvalidDataException("Invalid JSON") from exception
 
         if json_data is None:
             raise InvalidDataException("No data found!")
@@ -1558,6 +1558,10 @@ class App:
 
 # Ensures the script doesn't run if it is being imported as a library
 if __name__ == "__main__":
+    # Get the directory of the script
+    # Allows for the script to be run from /usr/local/bin via a symlink
+    script_dir: str = os.path.dirname(os.path.realpath(os.path.abspath(__file__)))
+
     # Argument Handling, allows for the user to open straight into a timetable to view
     parser = argparse.ArgumentParser(description='Simple timetable creator and viewer written in Python')
     parser.add_argument('opt_file', type=str, nargs='?',
